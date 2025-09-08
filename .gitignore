@@ -1,9 +1,30 @@
+# === FACTR Project Git Ignore ===
+
+# Runtime outputs (don’t commit big data!)
 snapshots/
 runs/
 *.wav
 *.jsonl
 *.npy
 *.parquet
+*.log
+
+# Jupyter
 .ipynb_checkpoints/
+*.ipynb_convert/
+*.ipynb~
+*.bak
+
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+
+# OS / Editor clutter
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
