@@ -1,0 +1,6 @@
+{
+  "when": "2025-09-09T20:57:05Z",
+  "audio_orig": "/content/drive/MyDrive/FATCR/data/raw/speFWRuuJNs.wav",
+  "audio_path": "/content/drive/MyDrive/FATCR/data/processed/speFWRuuJNs_16k_mono.wav",
+  "note": "This AUDIO_PATH will be used by FACTR_03_ASR+Diarize."
+}
