@@ -1,0 +1,11 @@
+{
+  "time": "2025-09-23T08:52:56.003570Z",
+  "artefacts": {
+    "kb_faiss": "data/processed/KB.faiss",
+    "kb_index_json": "data/processed/KB.index.json",
+    "kb_passages": "data/processed/KB_passages.jsonl"
+  },
+  "dim": 1536,
+  "normalized": true,
+  "model": "text-embedding-3-small"
+}

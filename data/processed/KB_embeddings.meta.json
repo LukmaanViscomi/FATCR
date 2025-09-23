@@ -1,0 +1,7 @@
+{
+  "model_name": "text-embedding-3-small",
+  "normalized": true,
+  "faiss_metric": "ip",
+  "count": 12696,
+  "dim": 1536
+}
