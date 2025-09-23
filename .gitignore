@@ -1,30 +1,52 @@
-# === FACTR Project Git Ignore ===
+# === FACTR Project .gitignore ===
 
-# Runtime outputs (don’t commit big data!)
-snapshots/
+# 1) Raw & scratch (never commit)
+data/raw/**
 runs/
-*.wav
-*.jsonl
-*.npy
-*.parquet
+*.tmp
 *.log
 
-# Jupyter
+# 2) Snapshots (large) — ignore by default, but allow manifests
+snapshots/**
+!snapshots/**/_MANIFEST.json
+
+# 3) Jupyter cache
 .ipynb_checkpoints/
-*.ipynb_convert/
+.ipynb_convert/
 *.ipynb~
 *.bak
 
-# Python
+# 4) Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.pkl
 
-# OS / Editor clutter
+# 5) OS / editor clutter
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
-*.tmp
+
+# 6) Generic large formats (ignored globally)…
+*.wav
+*.mp3
+*.flac
+*.jsonl
+*.json
+*.npy
+*.npz
+*.parquet
+*.faiss
+*.csv
+
+# 7) …but always ALLOW anything under data/processed/
+!data/processed/**
+!data/processed/**/*.jsonl
+!data/processed/**/*.json
+!data/processed/**/*.npy
+!data/processed/**/*.npz
+!data/processed/**/*.parquet
+!data/processed/**/*.faiss
+!data/processed/**/*.csv
