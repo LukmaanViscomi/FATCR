@@ -1,9 +1,14 @@
-# factr_app.py  (project root)
+from __future__ import annotations
 
 from pathlib import Path
 import json
-from typing import Optional  # <- add this line
+from typing import Any, Dict, Optional, List
 
+import html
+import io
+import re
+
+import pandas as pd
 import streamlit as st
 
 from factr.config import FactrConfig
@@ -11,14 +16,15 @@ from factr.ingest import ingest_youtube
 from factr.asr import transcribe_audio
 from factr.claims import extract_claims
 from factr.verify import verify_claims
-import pandas as pd
-import io  # add if not already imported
 from factr.kb import kb_commentary_for_group
-#Beginning of Edit – glossary support
+from factr.glossary import GLOSSARY
 
-from factr.glossary import GLOSSARY  # you already created this
 
-def lookup_word(word: str) -> dict:
+# =====================================================================
+# Glossary helpers
+# =====================================================================
+
+def lookup_word(word: str) -> Dict[str, Any]:
     """
     Look up a word in the local glossary and build some helpful links.
 
@@ -29,20 +35,65 @@ def lookup_word(word: str) -> dict:
         - 'wiktionary_url': link to Wiktionary
         - 'wikipedia_url': link to Wikipedia (best-effort)
     """
-    # Normalise the token a bit: lowercase and strip punctuation/brackets
     key = word.lower().strip(".,!?;:\"'()[]")
-    result = {
+    return {
         "word": word,
         "glossary": GLOSSARY.get(key),
         "wiktionary_url": f"https://en.wiktionary.org/wiki/{key}",
         "wikipedia_url": f"https://en.wikipedia.org/wiki/{key.capitalize()}",
     }
-    return result
-
-#end of Edit – glossary support
 
 
-#Beginning of Edit – new verdict badge mapping for per-tradition and combined verdicts
+def render_glossary_for_claim(claim_text: str) -> None:
+    """
+    Scan the claim text, find words that exist in the GLOSSARY,
+    and render short explanations for each one.
+    """
+    if not claim_text:
+        st.write("No claim text available for this claim.")
+        return
+
+    # Extract simple word tokens
+    words = re.findall(r"[A-Za-z']+", claim_text)
+    seen = set()
+    found: List[Dict[str, Any]] = []
+
+    for w in words:
+        key = w.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+
+        entry = GLOSSARY.get(key)
+        if entry:
+            found.append({"term": w, "entry": entry})
+
+    if not found:
+        st.write("_No glossary entries found for this claim yet._")
+        return
+
+    for item in found:
+        term = item["term"]
+        entry = item["entry"]
+
+        st.markdown(f"**{term.lower()}**")
+        if isinstance(entry, dict):
+            definition = (
+                entry.get("definition")
+                or entry.get("text")
+                or entry.get("description")
+                or str(entry)
+            )
+            st.write(definition)
+        else:
+            st.write(str(entry))
+        st.markdown("---")
+
+
+# =====================================================================
+# Verdict + confidence badges
+# =====================================================================
+
 def verdict_badge_html(verdict: Optional[str]) -> str:
     """
     Render a coloured badge for a verdict.
@@ -90,7 +141,7 @@ def verdict_badge_html(verdict: Optional[str]) -> str:
 
         label, colour = mapping.get(v, (v.upper(), "#7f8c8d"))
 
-    html = f"""
+    return f"""
     <div style="
         display:inline-flex;
         padding:0.25rem 0.75rem;
@@ -103,59 +154,57 @@ def verdict_badge_html(verdict: Optional[str]) -> str:
         text-transform:uppercase;
     ">{label}</div>
     """
-    return html
-#end of edit
 
-#Beginning of Edit – confidence badge helper
+
 def confidence_badge_html(confidence: Optional[float]) -> str:
     """
-    Render the circular confidence badge as HTML.
-    Expects confidence as 0–1 float (e.g. 0.9 -> 90%).
+    Render a compact circular confidence badge as HTML, aligned with the
+    verdict badges.
+
+    The value is expected in [0, 1]. We convert to a percentage and clamp.
     """
     if confidence is None:
-        # No confidence => render a grey empty circle
-        return """
-        <div style="display:flex;justify-content:flex-end;">
-          <div style="
-              width:56px;height:56px;
-              border-radius:999px;
-              border:2px solid #555555;
-              display:flex;align-items:center;justify-content:center;
-              font-size:0.8rem;
-              color:#aaaaaa;
-              font-weight:600;
-          ">
-            --
-          </div>
-        </div>
-        """
+        return ""
 
     try:
         pct = float(confidence) * 100.0
     except Exception:
         pct = 0.0
 
-    pct_int = round(pct)
+    pct = max(0.0, min(100.0, pct))
+    pct_int = int(round(pct))
 
     return f"""
-    <div style="display:flex;justify-content:flex-end;">
+    <div style="
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        margin-top:0.35rem;
+    ">
       <div style="
-          width:56px;height:56px;
-          border-radius:999px;
-          border:2px solid #f39c12;
-          display:flex;align-items:center;justify-content:center;
+          width:64px;
+          height:64px;
+          border-radius:50%;
+          border:3px solid #F7931A;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-weight:600;
           font-size:0.9rem;
-          color:#f39c12;
-          font-weight:700;
+          color:#F7931A;
+          box-shadow:0 0 0 1px rgba(0,0,0,0.6);
+          background:rgba(0,0,0,0.4);
       ">
         {pct_int}%
       </div>
     </div>
     """
-#End of Edit – confidence badge helper
 
 
-#Beginning of Edit – helper to phrase evidence headings
+# =====================================================================
+# Evidence heading helper
+# =====================================================================
+
 def evidence_heading_for_trad(trad_label: str, verdict: Optional[str]) -> str:
     """
     Turn a verdict into human text for the evidence expander title.
@@ -179,81 +228,29 @@ def evidence_heading_for_trad(trad_label: str, verdict: Optional[str]) -> str:
         action = "related to this claim"
 
     return f"{trad_label} evidence {action}"
-#end of edit
 
 
+# =====================================================================
+# Claim card renderer
+# =====================================================================
 
-def render_source_badge(col, source_label: str, verdict: str):
-    """Render 'Islamic sources' / 'Christian sources' / 'Both sources' + badge in a column."""
-    col.markdown(
-        f"<div style='font-size:0.75rem;margin-bottom:0.15rem;color:#bbbbbb;'>{source_label}</div>",
-        unsafe_allow_html=True,
-    )
-    col.markdown(verdict_badge_html(verdict), unsafe_allow_html=True)
-
-
-def render_confidence_circle(col, confidence):
-    """Render a confidence score as a circular badge."""
-    try:
-        if confidence is None:
-            value = 0.0
-        else:
-            value = float(confidence)
-    except Exception:
-        value = 0.0
-
-    # assume 0–1 range; convert to %
-    pct = max(0.0, min(1.0, value)) * 100.0
-
-    html = f"""
-    <div style="
-        display:flex;
-        flex-direction:column;
-        align-items:center;
-        justify-content:center;
-        gap:0.25rem;
-    ">
-      <div style="font-size:0.7rem;color:#bbbbbb;">Confidence</div>
-      <div style="
-          width:54px;height:54px;
-          border-radius:50%;
-          border:3px solid #f39c12;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          font-weight:600;
-          color:#f39c12;
-          font-size:0.85rem;
-      ">{pct:.0f}%</div>
-    </div>
+def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
     """
-    col.markdown(html, unsafe_allow_html=True)
-
-
-#Beginning of Edit – new claim card layout with numbered evidence & glossary
-def render_claim_card(idx: int, rec: dict) -> None:
-    """
-    Render a single claim as a 'card' with:
-
-      • Claim text
-      • Per-tradition verdict badges (Islamic / Christian)
-      • Combined verdict badge (Both sources)
-      • Confidence circle
-      • Natural-language explanation (with [Islamic N] / [Christian N] refs)
-      • Glossary expander for key terms
-      • Separate expanders for Islamic and Christian evidence, with
-        numbered quotes that match the indices used in the explanation.
+    Render one claim with:
+    - verdict badges for Islamic, Christian and combined views,
+    - confidence score,
+    - a short natural-language explanation,
+    - glossary of key terms in the claim,
+    - Islamic and Christian evidence lists with optional tafsir/exegesis.
     """
     claim_text = rec.get("claim_text") or ""
-    claim_id = rec.get("claim_id") or f"claim_{idx+1}"
-
     verdict_islam = rec.get("verdict_islam")
     verdict_christian = rec.get("verdict_christian")
     verdict_overall = rec.get("verdict_overall")
-    confidence = float(rec.get("confidence") or 0.0)
-
+    confidence = rec.get("confidence")
     explanation = rec.get("explanation") or ""
 
+    # These come from verify.py – list[dict] per tradition
     evidence_islam = rec.get("evidence_islam") or []
     evidence_christ = rec.get("evidence_christian") or []
 
@@ -261,23 +258,42 @@ def render_claim_card(idx: int, rec: dict) -> None:
     st.markdown(f"### Claim {idx + 1}")
     st.markdown(f"**{claim_text}**")
 
-    cols = st.columns([2, 2, 2, 1])
+    # --- Verdict row: Islamic / Christian / Both / Confidence ---------------
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 
-    with cols[0]:
-        st.caption("Islamic sources")
+    with col1:
+        st.markdown(
+            "<div style='text-align:center;font-size:0.9rem;'>Islamic sources</div>",
+            unsafe_allow_html=True,
+        )
         st.markdown(verdict_badge_html(verdict_islam), unsafe_allow_html=True)
 
-    with cols[1]:
-        st.caption("Christian sources")
+    with col2:
+        st.markdown(
+            "<div style='text-align:center;font-size:0.9rem;'>Christian sources</div>",
+            unsafe_allow_html=True,
+        )
         st.markdown(verdict_badge_html(verdict_christian), unsafe_allow_html=True)
 
-    with cols[2]:
-        st.caption("Both sources (combined)")
+    with col3:
+        st.markdown(
+            "<div style='text-align:center;font-size:0.9rem;'>Both sources (combined)</div>",
+            unsafe_allow_html=True,
+        )
         st.markdown(verdict_badge_html(verdict_overall), unsafe_allow_html=True)
 
-    with cols[3]:
-        st.caption("Confidence")
-        # this uses your existing confidence_badge_html helper
+    with col4:
+        # Title + small "?" hint
+        st.markdown(
+            """
+            <div style='text-align:center;font-size:0.9rem;'>
+              Confidence
+              <span style="font-size:0.8rem;opacity:0.75;"
+                    title="How sure the model is about these verdicts, based on how strongly the evidence matched.">?</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.markdown(confidence_badge_html(confidence), unsafe_allow_html=True)
 
     # --- Legend for the labels ----------------------------------------------
@@ -297,32 +313,40 @@ def render_claim_card(idx: int, rec: dict) -> None:
 - **CONFLICTED** – the two traditions clearly disagree.
 - **DOUBTFUL** – at least one tradition gives mixed or weak evidence.
 - **INSUFFICIENT** – not enough data from either side for a fair assessment.
+
+**Confidence %**
+
+- This is the model’s own estimate (0–100%) of how stable the overall verdict is,
+  given the passages it has seen. Higher means *stronger, more consistent*
+  evidence; lower means *weaker or more conflicted* evidence.
 """
         )
 
     # --- Natural-language explanation ---------------------------------------
     if explanation:
-        st.markdown("")
+        st.markdown("**Explanation**")
         st.markdown(explanation)
 
     # --- Glossary for key terms in this claim -------------------------------
     with st.expander("Explain key terms in this claim (glossary)"):
         render_glossary_for_claim(claim_text)
 
-    # --- Evidence: Islamic ---------------------------------------------------
+    # --- Evidence from primary sources --------------------------------------
+    if evidence_islam or evidence_christ:
+        st.markdown("### Evidence from primary sources")
+
+    # Islamic evidence
     if evidence_islam:
         heading_islam = evidence_heading_for_trad("Islamic", verdict_islam)
         with st.expander(heading_islam):
             for ev in evidence_islam:
-                ev_id = ev.get("id")  # 1-based index from the KB search
+                ev_id = ev.get("id")
                 ref = ev.get("ref") or ""
                 text = ev.get("text") or ""
                 label = f"[Islamic {ev_id}]" if ev_id is not None else "[Islamic]"
 
-                # main quote line – this is what [Islamic N] in the explanation refers to
                 st.markdown(f"- **{label} {ref}** – {text}")
 
-                # Optional: tafsir / commentary from the commentary KB, if available
                 group_key = ev.get("group_key")
                 if group_key:
                     with st.expander(f"↳ View tafsir / commentary for {label} {ref}"):
@@ -333,13 +357,16 @@ def render_claim_card(idx: int, rec: dict) -> None:
                             )
                         else:
                             for c in comments:
-                                c_ref = c.ref or ""
-                                c_text = c.text or ""
-                                st.markdown(f"- **{c_ref}** – {c_text}")
+                                c_ref = html.escape(c.ref or "")
+                                c_text = html.escape(c.text or "")
+                                st.markdown(
+                                    f"<p><strong>{c_ref}</strong> – {c_text}</p>",
+                                    unsafe_allow_html=True,
+                                )
     else:
         st.info("No Islamic evidence was selected for this claim.")
 
-    # --- Evidence: Christian -------------------------------------------------
+    # Christian evidence
     if evidence_christ:
         heading_christ = evidence_heading_for_trad("Christian", verdict_christian)
         with st.expander(heading_christ):
@@ -363,61 +390,65 @@ def render_claim_card(idx: int, rec: dict) -> None:
                             )
                         else:
                             for c in comments:
-                                c_ref = c.ref or ""
-                                c_text = c.text or ""
-                                st.markdown(f"- **{c_ref}** – {c_text}")
+                                c_ref = html.escape(c.ref or "")
+                                c_text = html.escape(c.text or "")
+                                st.markdown(
+                                    f"<p><strong>{c_ref}</strong> – {c_text}</p>",
+                                    unsafe_allow_html=True,
+                                )
     else:
         st.info("No Christian evidence was selected for this claim.")
 
     st.markdown("---")
-#end of edit
 
 
-#Beginning of Edit – glossary rendering helper
-def render_glossary_for_claim(claim_text: str) -> None:
+# =====================================================================
+# Render helper for one-click results
+# =====================================================================
+
+def render_oneclick_results(rows: List[Dict[str, Any]]) -> None:
     """
-    Very simple glossary lookup: we scan the claim text for any
-    terms that appear in glossary.GLOSSARY and print them out.
+    Render the 'Debate analysis – claims and verdicts' section
+    (table download + per-claim cards) from a list of verification rows.
     """
-    if not claim_text:
-        st.write("No claim text found.")
+    if not rows:
+        st.info("No verification records were produced.")
         return
 
-    text_lower = claim_text.lower()
-    found = []
-    for term, info in GLOSSARY.items():
-        if term.lower() in text_lower:
-            found.append((term, info))
+    df = pd.DataFrame(rows)
 
-    if not found:
-        st.write("No special glossary terms detected in this claim.")
-        return
+    st.subheader("Debate analysis – claims and verdicts")
 
-    for term, info in found:
-        st.markdown(f"**{term}**")
-        if isinstance(info, dict):
-            definition = info.get("definition") or info.get("meaning") or ""
-            if definition:
-                st.write(definition)
-            if info.get("notes"):
-                st.write(info["notes"])
-            if info.get("sources"):
-                st.write(f"_Sources: {info['sources']}_")
-        else:
-            st.write(str(info))
-        st.markdown("---")
-#end of edit
+    csv_buf = io.StringIO()
+    df.to_csv(csv_buf, index=False)
+    st.download_button(
+        "Download all as CSV",
+        data=csv_buf.getvalue(),
+        file_name="factr_verification_results.csv",
+        mime="text/csv",
+    )
+
+    st.markdown("")
+
+    for idx, rec in enumerate(rows):
+        render_claim_card(idx, rec)
 
 
+# =====================================================================
+# MAIN APP
+# =====================================================================
 
-
-def main():
+def main() -> None:
     st.set_page_config(page_title="FACTR – Debate Analyzer", layout="centered")
 
     st.title("FACTR – Debate Analyzer")
 
+    # Initialise session state for last_results
+    if "last_results" not in st.session_state:
+        st.session_state["last_results"] = None
+
     cfg = FactrConfig()
-    
+
     # ======================================================
     # One-click end-to-end debate analysis (beta)
     # ======================================================
@@ -461,7 +492,9 @@ def main():
             help="How many KB passages to retrieve for each claim.",
         )
 
-    if st.button("Analyse debate (end-to-end)"):
+    analyse_button = st.button("Analyse debate (end-to-end)")
+
+    if analyse_button:
         if not url_oneclick.strip():
             st.error("Please enter a YouTube URL.")
         else:
@@ -473,7 +506,7 @@ def main():
             # ---------------------------
             status.text("Step 1/4: Downloading & normalising audio…")
             try:
-                result = ingest_youtube(url_oneclick, cfg=cfg)
+                result = ingest_youtube(url_oneclick.strip(), cfg=cfg)
             except Exception as e:
                 st.error(f"Error during ingest: {e}")
                 st.stop()
@@ -481,12 +514,9 @@ def main():
             # Normalise whatever ingest_youtube returned
             run_id = None
             audio_path = None
-            ingest_meta = {}
+            ingest_meta: Dict[str, Any] = {}
 
             if isinstance(result, tuple):
-                # Common patterns:
-                #   (run_id, audio_path, meta)
-                #   (run_id, meta)
                 if len(result) == 3:
                     run_id, audio_path, ingest_meta = result
                 elif len(result) == 2:
@@ -494,12 +524,10 @@ def main():
                     if isinstance(ingest_meta, dict):
                         audio_path = ingest_meta.get("audio_path")
                 else:
-                    # Fallback: treat first element as meta dict
                     ingest_meta = result[0]
             elif isinstance(result, dict):
                 ingest_meta = result
 
-            # Try to fill in missing bits from meta
             if run_id is None and isinstance(ingest_meta, dict):
                 run_id = ingest_meta.get("run_id")
             if audio_path is None and isinstance(ingest_meta, dict):
@@ -511,12 +539,10 @@ def main():
 
             progress.progress(0.15)
 
-
             # ---------------------------
             # Step 2: Transcribe audio
             # ---------------------------
             def asr_progress(frac: float) -> None:
-                # Map [0,1] ASR progress into [0.15, 0.60] of the main bar
                 progress.progress(0.15 + 0.45 * frac)
                 status.text(f"Step 2/4: Transcribing audio… {frac*100:.1f}%")
 
@@ -524,8 +550,6 @@ def main():
                 utterances, asr_meta = transcribe_audio(
                     audio_path,
                     cfg=cfg,
-                    # uncomment if you switched model size:
-                    # model_size="medium.en",
                     progress_callback=asr_progress,
                 )
             except Exception as e:
@@ -572,38 +596,31 @@ def main():
             # -----------------------------------------
             # Show final verification results + evidence
             # -----------------------------------------
-            # Load rows from verification JSONL
-            rows: list[dict] = []
+            rows: List[Dict[str, Any]] = []
             ver_file = ver_meta.get("verification_path", ver_path)
             with open(ver_file, "r", encoding="utf-8") as f:
                 for line in f:
-                    if not line.strip():
+                    line = line.strip()
+                    if not line:
                         continue
                     rows.append(json.loads(line))
 
             if not rows:
                 st.info("No verification records were produced.")
+                st.session_state["last_results"] = None
             else:
-                # Build DataFrame for download/export
-                df = pd.DataFrame(rows)
+                st.session_state["last_results"] = rows
+                render_oneclick_results(rows)
 
-                st.subheader("Debate analysis – claims and verdicts")
+    # If we have previous results and the button is NOT pressed on this rerun,
+    # show the cached results so the page does not "forget" everything.
+    if not analyse_button and st.session_state.get("last_results"):
+        st.markdown("---")
+        render_oneclick_results(st.session_state["last_results"])
 
-                # Download all as CSV
-                csv_buf = io.StringIO()
-                df.to_csv(csv_buf, index=False)
-                st.download_button(
-                    "Download all as CSV",
-                    data=csv_buf.getvalue(),
-                    file_name="factr_verification_results.csv",
-                    mime="text/csv",
-                )
-
-                st.markdown("")
-
-                # Render each claim as a card
-                for idx, rec in enumerate(rows):
-                    render_claim_card(idx, rec)
+    # ======================================================
+    # Step-by-step pipeline (manual control)
+    # ======================================================
 
     # -----------------------
     # Step 1 – Ingest
@@ -668,7 +685,6 @@ def main():
             ingest_meta = json.loads(last_ingest_path.read_text(encoding="utf-8"))
             audio_path = ingest_meta["audio_path"]
 
-            # --- Streamlit progress widgets ---
             progress_bar = st.progress(0.0)
             status_text = st.empty()
 
@@ -681,7 +697,7 @@ def main():
                     utterances, asr_meta = transcribe_audio(
                         audio_path,
                         cfg=cfg,
-                        progress_callback=update_progress,  # <-- NEW
+                        progress_callback=update_progress,
                     )
                 except Exception as e:
                     st.error(f"Error during transcription: {e}")
@@ -715,13 +731,12 @@ def main():
     max_chunks = st.number_input(
         "Max chunks to process (0 = all)",
         min_value=0,
-        value=2, # set to '0' for no limit (set to 1-3 for testing)
+        value=2,
         step=1,
         help="Use a small number while testing to control cost.",
     )
 
     if st.button("Extract claims"):
-        # quick existence check
         utt_path = cfg.processed_dir / "UTTERANCES.parquet"
         if not utt_path.exists():
             st.error("UTTERANCES.parquet not found. Please run Step 2 first.")
@@ -740,8 +755,7 @@ def main():
                     st.write("**Chunks processed:**", meta["num_chunks"])
                     st.write("**Model:**", meta["model"])
 
-                    # Load a small sample to show
-                    rows = []
+                    rows: List[Dict[str, Any]] = []
                     with open(meta["claims_path"], "r", encoding="utf-8") as f:
                         for i, line in enumerate(f):
                             if i >= 50:
@@ -806,8 +820,7 @@ def main():
                     st.write("**Number of claims verified:**", meta["num_verifications"])
                     st.write("**Model:**", meta["model"])
 
-                    # Show a sample table of results
-                    rows = []
+                    rows: List[Dict[str, Any]] = []
                     with open(meta["verification_path"], "r", encoding="utf-8") as f:
                         for i, line in enumerate(f):
                             if i >= 50:
@@ -817,7 +830,6 @@ def main():
                         st.subheader("Sample of verification results")
                         df = pd.DataFrame(rows)
 
-                        # Basic table
                         show_cols = [
                             "claim_id",
                             "side",
@@ -831,24 +843,19 @@ def main():
                         df_basic = df[[c for c in show_cols if c in df.columns]]
                         st.dataframe(df_basic)
 
-                        #Beginning of Edit – claim text + glossary + evidence view
                         # Detailed evidence view for first few claims
                         st.subheader("Evidence details (first few claims)")
                         for _, row in df.head(5).iterrows():
                             header = (
                                 f"{row.get('claim_id')} – "
                                 f"{row.get('verdict_overall')} – "
-                                f"{row.get('claim_text')[:80]}..."
+                                f"{(row.get('claim_text') or '')[:80]}..."
                             )
                             with st.expander(header):
-                                # Show the full claim text at the top of the panel
                                 st.markdown("**Claim text (full):**")
                                 st.write(row.get("claim_text", ""))
 
-                                # Optional: glossary / key-term explanation for this claim
                                 with st.expander("Explain key terms in this claim"):
-                                    # This calls the helper we added earlier:
-                                    # render_glossary_for_claim(claim_text: str)
                                     render_glossary_for_claim(row.get("claim_text", ""))
 
                                 st.markdown("---")
@@ -876,13 +883,9 @@ def main():
                                             f"{ev.get('ref') or ''} – "
                                             f"{ev.get('text')}"
                                         )
-                        #end of edit – claim text + glossary + evidence view
                     else:
                         st.info("No verification records were produced.")
 
 
-
 if __name__ == "__main__":
     main()
-
-
