@@ -49,7 +49,7 @@ def _chunk_utterances(
     Make chunks of the transcript ~max_chars long.
 
     Each chunk text looks like:
-      [00:10–00:20] SPEAKER_00: some text...
+      [00:10–00:20] SPEAKER_00: some text.
     """
     chunks: List[Dict[str, Any]] = []
     cur_lines: List[str] = []
@@ -119,6 +119,9 @@ def _call_openai_for_chunk(
         "speaker": "SPEAKER_00"
       }
     """
+    #Beginning of Edit
+    # Updated prompt so that claim text is **always returned in English**,
+    # even when the original audio contains Arabic only.
     system_msg = (
         "You are an expert analyst extracting atomic claims from a "
         "religious debate transcript between a Christian and a Muslim. "
@@ -146,7 +149,18 @@ Return a JSON array of objects, each with:
 - "speaker": speaker label if obvious (like "SPEAKER_00").
 
 If no clear claims, return [].
+
+Very important:
+- Always write the "text" for each claim in clear **English**, even if the
+  original statement was partly or fully in Arabic (or another language).
+- You may keep short Arabic religious terms (for example: "Isa", "Insha'Allah")
+  inside the sentence, but the overall sentence must be understandable to an
+  English-speaking reader.
+- Do **not** return any claim whose "text" is only Arabic with no English
+  explanation. If you cannot reasonably translate or interpret a purely Arabic
+  sentence, simply omit that claim instead of returning it.
 """
+    #end of edit
 
     resp = client.chat.completions.create(
         model=model,

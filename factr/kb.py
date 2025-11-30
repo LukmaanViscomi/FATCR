@@ -141,3 +141,64 @@ def kb_search(
         )
 
     return hits
+
+
+#Beginning of Edit
+def kb_commentary_for_group(
+    group_key: str,
+    cfg: Optional[FactrConfig] = None,
+    tradition: Optional[str] = None,
+    max_items: int = 5,
+    commentary_genres: Optional[List[str]] = None,
+) -> List[KBHit]:
+    """
+    Return commentary / tafsir style KB entries that share the same
+    ``group_key`` as a given passage.
+
+    This lets the UI fetch *primary-source commentary* for any verse or
+    passage that was used as evidence during verification.
+
+    It simply filters the already-loaded KB metadata; no extra embedding
+    work is done.
+    """
+    cfg = cfg or FactrConfig()
+    _load_kb(cfg)
+
+    if commentary_genres is None:
+        commentary_genres = ["commentary", "tafsir"]
+
+    assert _KB_META is not None
+
+    genres_lower = {g.lower() for g in commentary_genres}
+    hits: List[KBHit] = []
+
+    for rec in _KB_META:
+        if rec.get("group_key") != group_key:
+            continue
+
+        if tradition:
+            trad = (rec.get("tradition") or "").lower()
+            if not trad.startswith(tradition.lower()):
+                continue
+
+        genre = (rec.get("genre") or "").lower()
+        if commentary_genres and genre not in genres_lower:
+            continue
+
+        hits.append(
+            KBHit(
+                score=0.0,  # no ranking here; it’s just a related list
+                text=rec.get("text", ""),
+                ref=rec.get("ref"),
+                tradition=rec.get("tradition"),
+                genre=rec.get("genre"),
+                source=rec.get("source"),
+                group_key=rec.get("group_key"),
+            )
+        )
+
+        if len(hits) >= max_items:
+            break
+
+    return hits
+#end of edit

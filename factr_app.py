@@ -177,9 +177,9 @@ def confidence_badge_html(confidence: Optional[float]) -> str:
     return f"""
     <div style="
         display:flex;
-        align-items:center;
+        align-items:flex-start;
         justify-content:center;
-        margin-top:0.35rem;
+        margin-top:0.6rem;
     ">
       <div style="
           width:64px;
@@ -199,6 +199,7 @@ def confidence_badge_html(confidence: Optional[float]) -> str:
       </div>
     </div>
     """
+
 
 
 # =====================================================================
@@ -259,30 +260,33 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
     st.markdown(f"**{claim_text}**")
 
     # --- Verdict row: Islamic / Christian / Both / Confidence ---------------
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    # We use 4 equal-width columns so that each badge sits directly
+    # under its heading label and is nicely centred.
+    cols = st.columns([1, 1, 1, 1])
 
-    with col1:
+    with cols[0]:
         st.markdown(
-            "<div style='text-align:center;font-size:0.9rem;'>Islamic sources</div>",
+            "<div style='text-align:left;font-size:0.9rem;'>Islamic sources</div>",
             unsafe_allow_html=True,
         )
         st.markdown(verdict_badge_html(verdict_islam), unsafe_allow_html=True)
 
-    with col2:
+    with cols[1]:
         st.markdown(
-            "<div style='text-align:center;font-size:0.9rem;'>Christian sources</div>",
+            "<div style='text-align:left;font-size:0.9rem;'>Christian sources</div>",
             unsafe_allow_html=True,
         )
         st.markdown(verdict_badge_html(verdict_christian), unsafe_allow_html=True)
 
-    with col3:
+    with cols[2]:
         st.markdown(
-            "<div style='text-align:center;font-size:0.9rem;'>Both sources (combined)</div>",
+            "<div style='text-align:left;font-size:0.9rem;'>Both sources (combined)</div>",
             unsafe_allow_html=True,
         )
         st.markdown(verdict_badge_html(verdict_overall), unsafe_allow_html=True)
 
-    with col4:
+
+    with cols[3]:
         # Title + small "?" hint
         st.markdown(
             """
@@ -294,7 +298,18 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
             """,
             unsafe_allow_html=True,
         )
-        st.markdown(confidence_badge_html(confidence), unsafe_allow_html=True)
+        # Uses your existing confidence_badge_html helper, but force-centre it
+        conf_html = confidence_badge_html(confidence) or ""
+        st.markdown(
+            f"<div style='text-align:center;'>{conf_html}</div>",
+            unsafe_allow_html=True,
+        )
+
+
+    # --- Legend for the labels ----------------------------------------------
+
+        
+
 
     # --- Legend for the labels ----------------------------------------------
     with st.expander("What do these verdict labels mean?"):
@@ -357,12 +372,21 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                             )
                         else:
                             for c in comments:
-                                c_ref = html.escape(c.ref or "")
-                                c_text = html.escape(c.text or "")
+                                c_ref = c.ref or ""
+                                c_text = c.text or ""
+
+                                st.markdown(f"**{c_ref}**")
+                                # Beginning of Edit – render tafsir as plain text (no green highlight)
                                 st.markdown(
-                                    f"<p><strong>{c_ref}</strong> – {c_text}</p>",
+                                    "<div style='white-space:pre-wrap;font-size:0.95rem;'>"
+                                    + html.escape(c_text or "")
+                                    + "</div>",
                                     unsafe_allow_html=True,
                                 )
+                                # End of Edit
+                                st.markdown("---")
+
+
     else:
         st.info("No Islamic evidence was selected for this claim.")
 
@@ -390,12 +414,21 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                             )
                         else:
                             for c in comments:
-                                c_ref = html.escape(c.ref or "")
-                                c_text = html.escape(c.text or "")
+                                c_ref = c.ref or ""
+                                c_text = c.text or ""
+
+                                st.markdown(f"**{c_ref}**")
+                                # Beginning of Edit – render exegesis as plain text
                                 st.markdown(
-                                    f"<p><strong>{c_ref}</strong> – {c_text}</p>",
+                                    "<div style='white-space:pre-wrap;font-size:0.95rem;'>"
+                                    + html.escape(c_text or "")
+                                    + "</div>",
                                     unsafe_allow_html=True,
                                 )
+                                # End of Edit
+                                st.markdown("---")
+
+
     else:
         st.info("No Christian evidence was selected for this claim.")
 
