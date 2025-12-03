@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 from typing import Any, Dict, Optional, List
+from datetime import datetime  # <- for logging timestamps
 
 import html
 import io
@@ -131,7 +132,7 @@ def verdict_badge_html(verdict: Optional[str]) -> str:
             "divided":      ("DIVIDED",     "#f39c12"),
             "both":         ("DIVIDED",     "#f39c12"),
 
-            "insufficient": ("INSUFFICIENT","#7f8c8d"),
+            "insufficient": ("INSUFFICIENT", "#7f8c8d"),
 
             # Combined verdict (both sources)
             "agreement":    ("AGREEMENT",   "#2ecc71"),
@@ -201,7 +202,6 @@ def confidence_badge_html(confidence: Optional[float]) -> str:
     """
 
 
-
 # =====================================================================
 # Evidence heading helper
 # =====================================================================
@@ -260,8 +260,6 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
     st.markdown(f"**{claim_text}**")
 
     # --- Verdict row: Islamic / Christian / Both / Confidence ---------------
-    # We use 4 equal-width columns so that each badge sits directly
-    # under its heading label and is nicely centred.
     cols = st.columns([1, 1, 1, 1])
 
     with cols[0]:
@@ -285,7 +283,6 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
         )
         st.markdown(verdict_badge_html(verdict_overall), unsafe_allow_html=True)
 
-
     with cols[3]:
         # Title + small "?" hint
         st.markdown(
@@ -298,18 +295,11 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
             """,
             unsafe_allow_html=True,
         )
-        # Uses your existing confidence_badge_html helper, but force-centre it
         conf_html = confidence_badge_html(confidence) or ""
         st.markdown(
             f"<div style='text-align:center;'>{conf_html}</div>",
             unsafe_allow_html=True,
         )
-
-
-    # --- Legend for the labels ----------------------------------------------
-
-        
-
 
     # --- Legend for the labels ----------------------------------------------
     with st.expander("What do these verdict labels mean?"):
@@ -376,17 +366,13 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                                 c_text = c.text or ""
 
                                 st.markdown(f"**{c_ref}**")
-                                # Beginning of Edit – render tafsir as plain text (no green highlight)
                                 st.markdown(
                                     "<div style='white-space:pre-wrap;font-size:0.95rem;'>"
                                     + html.escape(c_text or "")
                                     + "</div>",
                                     unsafe_allow_html=True,
                                 )
-                                # End of Edit
                                 st.markdown("---")
-
-
     else:
         st.info("No Islamic evidence was selected for this claim.")
 
@@ -418,17 +404,13 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                                 c_text = c.text or ""
 
                                 st.markdown(f"**{c_ref}**")
-                                # Beginning of Edit – render exegesis as plain text
                                 st.markdown(
                                     "<div style='white-space:pre-wrap;font-size:0.95rem;'>"
                                     + html.escape(c_text or "")
                                     + "</div>",
                                     unsafe_allow_html=True,
                                 )
-                                # End of Edit
                                 st.markdown("---")
-
-
     else:
         st.info("No Christian evidence was selected for this claim.")
 
@@ -476,11 +458,26 @@ def main() -> None:
 
     st.title("FACTR – Debate Analyzer")
 
-    # Initialise session state for last_results
+    # Session state for cached results + run log
     if "last_results" not in st.session_state:
         st.session_state["last_results"] = None
+    if "run_log" not in st.session_state:
+        st.session_state["run_log"] = []
 
     cfg = FactrConfig()
+    log_file = cfg.processed_dir / "ONECLICK_RUN.log"
+
+    # Simple helper to log messages both to session_state and to file
+    def log(msg: str) -> None:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        line = f"[{ts}] {msg}"
+        st.session_state["run_log"].append(line)
+        try:
+            with log_file.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except Exception:
+            # Logging failure should never crash the app
+            pass
 
     # ======================================================
     # One-click end-to-end debate analysis (beta)
@@ -531,119 +528,175 @@ def main() -> None:
         if not url_oneclick.strip():
             st.error("Please enter a YouTube URL.")
         else:
+            # fresh log for this run
+            st.session_state["run_log"] = []
+            log(f"Starting one-click analysis for URL: {url_oneclick.strip()}")
+            log(
+                f"Settings – max_chunks={max_chunks_all}, "
+                f"max_claims={max_claims_all}, top_k={top_k_all}"
+            )
+
             progress = st.progress(0.0)
             status = st.empty()
+            error = False
 
             # ---------------------------
             # Step 1: Ingest YouTube audio
             # ---------------------------
             status.text("Step 1/4: Downloading & normalising audio…")
+            log("Step 1/4 – ingest_youtube() starting.")
             try:
                 result = ingest_youtube(url_oneclick.strip(), cfg=cfg)
+                log("Step 1/4 – ingest_youtube() completed successfully.")
             except Exception as e:
-                st.error(f"Error during ingest: {e}")
-                st.stop()
+                msg = f"Error during ingest: {e}"
+                st.error(msg)
+                log(msg)
+                error = True
 
-            # Normalise whatever ingest_youtube returned
-            run_id = None
-            audio_path = None
-            ingest_meta: Dict[str, Any] = {}
+            # Normalise ingest result only if step 1 succeeded
+            if not error:
+                run_id = None
+                audio_path = None
+                ingest_meta: Dict[str, Any] = {}
 
-            if isinstance(result, tuple):
-                if len(result) == 3:
-                    run_id, audio_path, ingest_meta = result
-                elif len(result) == 2:
-                    run_id, ingest_meta = result
-                    if isinstance(ingest_meta, dict):
-                        audio_path = ingest_meta.get("audio_path")
+                if isinstance(result, tuple):
+                    if len(result) == 3:
+                        run_id, audio_path, ingest_meta = result
+                    elif len(result) == 2:
+                        run_id, ingest_meta = result
+                        if isinstance(ingest_meta, dict):
+                            audio_path = ingest_meta.get("audio_path")
+                    else:
+                        ingest_meta = result[0]
+                elif isinstance(result, dict):
+                    ingest_meta = result
+
+                if run_id is None and isinstance(ingest_meta, dict):
+                    run_id = ingest_meta.get("run_id")
+                if audio_path is None and isinstance(ingest_meta, dict):
+                    audio_path = ingest_meta.get("audio_path")
+
+                if not audio_path:
+                    msg = "Could not determine audio_path from ingest_youtube result."
+                    st.error(msg)
+                    log(msg)
+                    error = True
                 else:
-                    ingest_meta = result[0]
-            elif isinstance(result, dict):
-                ingest_meta = result
-
-            if run_id is None and isinstance(ingest_meta, dict):
-                run_id = ingest_meta.get("run_id")
-            if audio_path is None and isinstance(ingest_meta, dict):
-                audio_path = ingest_meta.get("audio_path")
-
-            if not audio_path:
-                st.error("Could not determine audio_path from ingest_youtube result.")
-                st.stop()
+                    log(f"Using audio_path={audio_path} (run_id={run_id}).")
 
             progress.progress(0.15)
 
             # ---------------------------
             # Step 2: Transcribe audio
             # ---------------------------
-            def asr_progress(frac: float) -> None:
-                progress.progress(0.15 + 0.45 * frac)
-                status.text(f"Step 2/4: Transcribing audio… {frac*100:.1f}%")
+            if not error:
+                def asr_progress(frac: float) -> None:
+                    progress.progress(0.15 + 0.45 * frac)
+                    status.text(f"Step 2/4: Transcribing audio… {frac*100:.1f}%")
 
-            try:
-                utterances, asr_meta = transcribe_audio(
-                    audio_path,
-                    cfg=cfg,
-                    progress_callback=asr_progress,
-                )
-            except Exception as e:
-                st.error(f"Error during transcription: {e}")
-                st.stop()
+                status.text("Step 2/4: Transcribing audio…")
+                log("Step 2/4 – transcribe_audio() starting.")
+                try:
+                    utterances, asr_meta = transcribe_audio(
+                        audio_path,
+                        cfg=cfg,
+                        progress_callback=asr_progress,
+                    )
+                    log(
+                        "Step 2/4 – transcription complete: "
+                        f"{asr_meta.get('num_utterances')} utterances, "
+                        f"duration={asr_meta.get('duration_sec')}s."
+                    )
+                except Exception as e:
+                    msg = f"Error during transcription: {e}"
+                    st.error(msg)
+                    log(msg)
+                    error = True
 
             progress.progress(0.60)
 
             # ---------------------------
             # Step 3: Extract claims
             # ---------------------------
-            status.text("Step 3/4: Extracting claims from transcript…")
-            mc_chunks = None if max_chunks_all == 0 else int(max_chunks_all)
-            try:
-                claims_path, claims_meta = extract_claims(
-                    cfg=cfg,
-                    max_chunks=mc_chunks,
-                )
-            except Exception as e:
-                st.error(f"Error during claim extraction: {e}")
-                st.stop()
+            if not error:
+                status.text("Step 3/4: Extracting claims from transcript…")
+                mc_chunks = None if max_chunks_all == 0 else int(max_chunks_all)
+                log(f"Step 3/4 – extract_claims() starting (max_chunks={mc_chunks}).")
+                try:
+                    claims_path, claims_meta = extract_claims(
+                        cfg=cfg,
+                        max_chunks=mc_chunks,
+                    )
+                    log(
+                        "Step 3/4 – extract_claims() complete: "
+                        f"{claims_meta.get('num_claims')} claims, "
+                        f"chunks={claims_meta.get('num_chunks')}."
+                    )
+                except Exception as e:
+                    msg = f"Error during claim extraction: {e}"
+                    st.error(msg)
+                    log(msg)
+                    error = True
 
             progress.progress(0.75)
 
             # ---------------------------
             # Step 4: Verify claims vs KB
             # ---------------------------
-            status.text("Step 4/4: Verifying claims against the KB…")
-            mc_claims = None if max_claims_all == 0 else int(max_claims_all)
-            try:
-                ver_path, ver_meta = verify_claims(
-                    cfg=cfg,
-                    max_claims=mc_claims,
-                    top_k_evidence=int(top_k_all),
+            if not error:
+                status.text("Step 4/4: Verifying claims against the KB…")
+                mc_claims = None if max_claims_all == 0 else int(max_claims_all)
+                log(
+                    "Step 4/4 – verify_claims() starting "
+                    f"(max_claims={mc_claims}, top_k={int(top_k_all)})."
                 )
-            except Exception as e:
-                st.error(f"Error during verification: {e}")
-                st.stop()
+                try:
+                    ver_path, ver_meta = verify_claims(
+                        cfg=cfg,
+                        max_claims=mc_claims,
+                        top_k_evidence=int(top_k_all),
+                    )
+                    log(
+                        "Step 4/4 – verify_claims() complete: "
+                        f"{ver_meta.get('num_verifications')} verifications."
+                    )
+                except Exception as e:
+                    msg = f"Error during verification: {e}"
+                    st.error(msg)
+                    log(msg)
+                    error = True
 
-            progress.progress(1.0)
-            status.text("Analysis complete ✅")
-            st.success("End-to-end debate analysis complete ✅")
-
-            # -----------------------------------------
-            # Show final verification results + evidence
-            # -----------------------------------------
-            rows: List[Dict[str, Any]] = []
-            ver_file = ver_meta.get("verification_path", ver_path)
-            with open(ver_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    rows.append(json.loads(line))
-
-            if not rows:
-                st.info("No verification records were produced.")
+            if error:
+                progress.progress(0.0)
+                status.text("Analysis failed – see processing log below.")
                 st.session_state["last_results"] = None
+                log("One-click analysis finished with ERRORS.")
             else:
-                st.session_state["last_results"] = rows
-                render_oneclick_results(rows)
+                progress.progress(1.0)
+                status.text("Analysis complete ✅")
+                st.success("End-to-end debate analysis complete ✅")
+                log("One-click analysis finished successfully.")
+
+                # -----------------------------------------
+                # Show final verification results + evidence
+                # -----------------------------------------
+                rows: List[Dict[str, Any]] = []
+                ver_file = ver_meta.get("verification_path", ver_path)
+                with open(ver_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        rows.append(json.loads(line))
+
+                if not rows:
+                    st.info("No verification records were produced.")
+                    st.session_state["last_results"] = None
+                    log("Verification file contained no rows.")
+                else:
+                    st.session_state["last_results"] = rows
+                    render_oneclick_results(rows)
 
     # If we have previous results and the button is NOT pressed on this rerun,
     # show the cached results so the page does not "forget" everything.
@@ -651,273 +704,307 @@ def main() -> None:
         st.markdown("---")
         render_oneclick_results(st.session_state["last_results"])
 
-    # ======================================================
-    # Step-by-step pipeline (manual control)
-    # ======================================================
-
-    # -----------------------
-    # Step 1 – Ingest
-    # -----------------------
-    st.header("Step 1 – Download & normalise audio")
-
-    st.write(
-        "Paste a **YouTube debate URL** below and click "
-        "**Download & normalise audio**.\n\n"
-        "This step just downloads the audio and converts it to 16 kHz mono WAV."
-    )
-
-    youtube_url = st.text_input("YouTube URL:", "")
-
-    if st.button("Download & normalise audio", type="primary"):
-        if not youtube_url.strip():
-            st.error("Please enter a YouTube URL first.")
+    # Show processing log (for this session)
+    with st.expander("View processing log (this session)", expanded=False):
+        log_lines: List[str] = st.session_state.get("run_log") or []
+        if not log_lines:
+            st.write("No one-click runs logged yet.")
         else:
-            with st.spinner("Downloading and processing audio…"):
-                try:
-                    snap = ingest_youtube(youtube_url.strip(), cfg=cfg)
-                except Exception as e:
-                    st.error(f"Error during ingest: {e}")
-                else:
-                    st.success("Audio ingest complete ✅")
+            # most recent first
+            for line in reversed(log_lines[-200:]):
+                st.text(line)
 
-                    st.write("**Run ID:**", snap["run_id"])
-                    st.write("**YouTube URL:**", snap["youtube_url"])
-                    st.write("**Audio path (local):**", snap["audio_path"])
-                    st.write("**Duration (seconds):**", f"{snap['duration_sec']:.1f}")
-                    st.write("**Sample rate:**", snap["sample_rate"])
-                    st.write("**Channels:**", snap["channels"])
-
-                    st.info(
-                        "The WAV file is stored under "
-                        "`data/processed/` in your FATCR project. "
-                        "Next steps will use this file for transcription, "
-                        "claim extraction, and verification."
-                    )
+    # ======================================================
+    # Step-by-step pipeline (manual control) – ADVANCED
+    # ======================================================
 
     st.markdown("---")
+    with st.expander(
+        "Advanced: step-by-step pipeline (manual control)", expanded=False
+    ):
+        # -----------------------
+        # Step 1 – Ingest
+        # -----------------------
+        st.header("Step 1 – Download & normalise audio")
 
-    # -----------------------
-    # Step 2 – Transcribe
-    # -----------------------
-    st.header("Step 2 – Transcribe latest audio")
+        st.write(
+            "Paste a **YouTube debate URL** below and click "
+            "**Download & normalise audio**.\n\n"
+            "This step just downloads the audio and converts it to 16 kHz mono WAV."
+        )
 
-    st.write(
-        "This will transcribe the most recently ingested audio file using "
-        "Whisper (faster-whisper). For now, diarisation is not enabled; "
-        "all segments are marked as SPEAKER_00."
-    )
+        youtube_url = st.text_input("YouTube URL:", "")
 
-    if st.button("Transcribe latest audio"):
-        last_ingest_path = cfg.processed_dir / "LAST_INGEST.json"
-        if not last_ingest_path.exists():
-            st.error(
-                "No ingested audio found. Please run Step 1 first "
-                "(Download & normalise audio)."
-            )
-        else:
-            ingest_meta = json.loads(last_ingest_path.read_text(encoding="utf-8"))
-            audio_path = ingest_meta["audio_path"]
-
-            progress_bar = st.progress(0.0)
-            status_text = st.empty()
-
-            def update_progress(frac: float) -> None:
-                progress_bar.progress(frac)
-                status_text.text(f"Transcribing… {frac * 100:.1f}%")
-
-            with st.spinner("Transcribing audio… this may take a while for long videos."):
-                try:
-                    utterances, asr_meta = transcribe_audio(
-                        audio_path,
-                        cfg=cfg,
-                        progress_callback=update_progress,
-                    )
-                except Exception as e:
-                    st.error(f"Error during transcription: {e}")
-                else:
-                    progress_bar.progress(1.0)
-                    status_text.text("Transcription 100% complete.")
-                    st.success("Transcription complete ✅")
-
-                    st.write("**Audio path:**", asr_meta["audio_path"])
-                    st.write("**Language detected:**", asr_meta["language"])
-                    st.write("**Duration (seconds):**", f"{asr_meta['duration_sec']:.1f}")
-                    st.write("**Number of segments:**", asr_meta["num_utterances"])
-                    st.write("**Model size:**", asr_meta["model_size"])
-                    st.write("**Device:**", asr_meta["device"])
-
-                    st.subheader("Sample of utterances")
-                    st.dataframe(utterances.head(20))
-
-    st.markdown("---")
-
-    # -----------------------
-    # Step 3 – Extract claims
-    # -----------------------
-    st.header("Step 3 – Extract claims from transcript")
-
-    st.write(
-        "This will call the OpenAI API on the transcribed debate to extract "
-        "atomic claims in JSON form. Make sure you have run Step 2 first."
-    )
-
-    max_chunks = st.number_input(
-        "Max chunks to process (0 = all)",
-        min_value=0,
-        value=2,
-        step=1,
-        help="Use a small number while testing to control cost.",
-    )
-
-    if st.button("Extract claims"):
-        utt_path = cfg.processed_dir / "UTTERANCES.parquet"
-        if not utt_path.exists():
-            st.error("UTTERANCES.parquet not found. Please run Step 2 first.")
-        else:
-            with st.spinner("Extracting claims with OpenAI…"):
-                try:
-                    mc = None if max_chunks == 0 else int(max_chunks)
-                    claims_path, meta = extract_claims(cfg=cfg, max_chunks=mc)
-                except Exception as e:
-                    st.error(f"Error during claim extraction: {e}")
-                else:
-                    st.success("Claim extraction complete ✅")
-
-                    st.write("**Claims file:**", meta["claims_path"])
-                    st.write("**Number of claims:**", meta["num_claims"])
-                    st.write("**Chunks processed:**", meta["num_chunks"])
-                    st.write("**Model:**", meta["model"])
-
-                    rows: List[Dict[str, Any]] = []
-                    with open(meta["claims_path"], "r", encoding="utf-8") as f:
-                        for i, line in enumerate(f):
-                            if i >= 50:
-                                break
-                            rows.append(json.loads(line))
-                    if rows:
-                        st.subheader("Sample of extracted claims")
-                        st.dataframe(pd.DataFrame(rows))
+        if st.button("Download & normalise audio", type="primary"):
+            if not youtube_url.strip():
+                st.error("Please enter a YouTube URL first.")
+            else:
+                with st.spinner("Downloading and processing audio…"):
+                    try:
+                        snap = ingest_youtube(youtube_url.strip(), cfg=cfg)
+                    except Exception as e:
+                        st.error(f"Error during ingest: {e}")
                     else:
-                        st.info("No claims were extracted (model returned empty lists).")
+                        st.success("Audio ingest complete ✅")
 
-    st.markdown("---")
+                        st.write("**Run ID:**", snap["run_id"])
+                        st.write("**YouTube URL:**", snap["youtube_url"])
+                        st.write("**Audio path (local):**", snap["audio_path"])
+                        st.write("**Duration (seconds):**", f"{snap['duration_sec']:.1f}")
+                        st.write("**Sample rate:**", snap["sample_rate"])
+                        st.write("**Channels:**", snap["channels"])
 
-    # -----------------------
-    # Step 4 – Analyse claims against KB
-    # -----------------------
-    st.header("Step 4 – Analyse claims against KB")
+                        st.info(
+                            "The WAV file is stored under "
+                            "`data/processed/` in your FATCR project. "
+                            "Next steps will use this file for transcription, "
+                            "claim extraction, and verification."
+                        )
 
-    st.write(
-        "This step compares each extracted claim to your Islamic and Christian "
-        "knowledge base, then asks GPT to label it as supported, contradicted, "
-        "mixed, or insufficient."
-    )
+        st.markdown("---")
 
-    max_claims = st.number_input(
-        "Max claims to verify (0 = all)",
-        min_value=0,
-        value=5,
-        step=1,
-        help="Use a small number while testing to control API cost.",
-    )
+        # -----------------------
+        # Step 2 – Transcribe
+        # -----------------------
+        st.header("Step 2 – Transcribe latest audio")
 
-    top_k_evidence = st.number_input(
-        "Top-K evidence passages per tradition",
-        min_value=1,
-        value=5,
-        step=1,
-        help="How many passages to retrieve from each tradition for each claim.",
-    )
+        st.write(
+            "This will transcribe the most recently ingested audio file using "
+            "Whisper (faster-whisper). For now, diarisation is not enabled; "
+            "all segments are marked as SPEAKER_00."
+        )
 
-    if st.button("Analyse claims vs KB"):
-        ver_path = cfg.processed_dir / "VERIFICATION.jsonl"
-        claims_path = cfg.processed_dir / "CLAIMS.jsonl"
+        if st.button("Transcribe latest audio"):
+            last_ingest_path = cfg.processed_dir / "LAST_INGEST.json"
+            if not last_ingest_path.exists():
+                st.error(
+                    "No ingested audio found. Please run Step 1 first "
+                    "(Download & normalise audio)."
+                )
+            else:
+                ingest_meta = json.loads(last_ingest_path.read_text(encoding="utf-8"))
+                audio_path = ingest_meta["audio_path"]
 
-        if not claims_path.exists():
-            st.error("CLAIMS.jsonl not found. Please run Step 3 first.")
-        else:
-            with st.spinner("Verifying claims against the KB…"):
-                try:
-                    mc = None if max_claims == 0 else int(max_claims)
-                    ver_path, meta = verify_claims(
-                        cfg=cfg,
-                        max_claims=mc,
-                        top_k_evidence=int(top_k_evidence),
-                    )
-                except Exception as e:
-                    st.error(f"Error during verification: {e}")
-                else:
-                    st.success("Verification complete ✅")
+                progress_bar = st.progress(0.0)
+                status_text = st.empty()
 
-                    st.write("**Verification file:**", meta["verification_path"])
-                    st.write("**Number of claims verified:**", meta["num_verifications"])
-                    st.write("**Model:**", meta["model"])
+                def update_progress(frac: float) -> None:
+                    progress_bar.progress(frac)
+                    status_text.text(f"Transcribing… {frac * 100:.1f}%")
 
-                    rows: List[Dict[str, Any]] = []
-                    with open(meta["verification_path"], "r", encoding="utf-8") as f:
-                        for i, line in enumerate(f):
-                            if i >= 50:
-                                break
-                            rows.append(json.loads(line))
-                    if rows:
-                        st.subheader("Sample of verification results")
-                        df = pd.DataFrame(rows)
+                with st.spinner(
+                    "Transcribing audio… this may take a while for long videos."
+                ):
+                    try:
+                        utterances, asr_meta = transcribe_audio(
+                            audio_path,
+                            cfg=cfg,
+                            progress_callback=update_progress,
+                        )
+                    except Exception as e:
+                        st.error(f"Error during transcription: {e}")
+                    else:
+                        progress_bar.progress(1.0)
+                        status_text.text("Transcription 100% complete.")
+                        st.success("Transcription complete ✅")
 
-                        show_cols = [
-                            "claim_id",
-                            "side",
-                            "verdict_overall",
-                            "verdict_islam",
-                            "verdict_christian",
-                            "confidence",
-                            "claim_text",
-                            "explanation",
-                        ]
-                        df_basic = df[[c for c in show_cols if c in df.columns]]
-                        st.dataframe(df_basic)
+                        st.write("**Audio path:**", asr_meta["audio_path"])
+                        st.write("**Language detected:**", asr_meta["language"])
+                        st.write(
+                            "**Duration (seconds):**", f"{asr_meta['duration_sec']:.1f}"
+                        )
+                        st.write("**Number of segments:**", asr_meta["num_utterances"])
+                        st.write("**Model size:**", asr_meta["model_size"])
+                        st.write("**Device:**", asr_meta["device"])
 
-                        # Detailed evidence view for first few claims
-                        st.subheader("Evidence details (first few claims)")
-                        for _, row in df.head(5).iterrows():
-                            header = (
-                                f"{row.get('claim_id')} – "
-                                f"{row.get('verdict_overall')} – "
-                                f"{(row.get('claim_text') or '')[:80]}..."
+                        st.subheader("Sample of utterances")
+                        st.dataframe(utterances.head(20))
+
+        st.markdown("---")
+
+        # -----------------------
+        # Step 3 – Extract claims
+        # -----------------------
+        st.header("Step 3 – Extract claims from transcript")
+
+        st.write(
+            "This will call the OpenAI API on the transcribed debate to extract "
+            "atomic claims in JSON form. Make sure you have run Step 2 first."
+        )
+
+        max_chunks = st.number_input(
+            "Max chunks to process (0 = all)",
+            min_value=0,
+            value=2,
+            step=1,
+            help="Use a small number while testing to control cost.",
+        )
+
+        if st.button("Extract claims"):
+            utt_path = cfg.processed_dir / "UTTERANCES.parquet"
+            if not utt_path.exists():
+                st.error("UTTERANCES.parquet not found. Please run Step 2 first.")
+            else:
+                with st.spinner("Extracting claims with OpenAI…"):
+                    try:
+                        mc = None if max_chunks == 0 else int(max_chunks)
+                        claims_path, meta = extract_claims(cfg=cfg, max_chunks=mc)
+                    except Exception as e:
+                        st.error(f"Error during claim extraction: {e}")
+                    else:
+                        st.success("Claim extraction complete ✅")
+
+                        st.write("**Claims file:**", meta["claims_path"])
+                        st.write("**Number of claims:**", meta["num_claims"])
+                        st.write("**Chunks processed:**", meta["num_chunks"])
+                        st.write("**Model:**", meta["model"])
+
+                        rows: List[Dict[str, Any]] = []
+                        with open(meta["claims_path"], "r", encoding="utf-8") as f:
+                            for i, line in enumerate(f):
+                                if i >= 50:
+                                    break
+                                rows.append(json.loads(line))
+                        if rows:
+                            st.subheader("Sample of extracted claims")
+                            st.dataframe(pd.DataFrame(rows))
+                        else:
+                            st.info(
+                                "No claims were extracted (model returned empty lists)."
                             )
-                            with st.expander(header):
-                                st.markdown("**Claim text (full):**")
-                                st.write(row.get("claim_text", ""))
 
-                                with st.expander("Explain key terms in this claim"):
-                                    render_glossary_for_claim(row.get("claim_text", ""))
+        st.markdown("---")
 
-                                st.markdown("---")
-                                st.markdown("**Islamic evidence:**")
-                                ev_islam = row.get("evidence_islam") or []
-                                if not ev_islam:
-                                    st.write("_No Islamic evidence selected._")
-                                else:
-                                    for ev in ev_islam:
-                                        st.write(
-                                            f"[{ev.get('id')}] "
-                                            f"{ev.get('ref') or ''} – "
-                                            f"{ev.get('text')}"
-                                        )
+        # -----------------------
+        # Step 4 – Analyse claims against KB
+        # -----------------------
+        st.header("Step 4 – Analyse claims against KB")
 
-                                st.markdown("---")
-                                st.markdown("**Christian evidence:**")
-                                ev_christ = row.get("evidence_christian") or []
-                                if not ev_christ:
-                                    st.write("_No Christian evidence selected._")
-                                else:
-                                    for ev in ev_christ:
-                                        st.write(
-                                            f"[{ev.get('id')}] "
-                                            f"{ev.get('ref') or ''} – "
-                                            f"{ev.get('text')}"
-                                        )
+        st.write(
+            "This step compares each extracted claim to your Islamic and Christian "
+            "knowledge base, then asks GPT to label it as supported, contradicted, "
+            "mixed, or insufficient."
+        )
+
+        max_claims = st.number_input(
+            "Max claims to verify (0 = all)",
+            min_value=0,
+            value=5,
+            step=1,
+            help="Use a small number while testing to control API cost.",
+        )
+
+        top_k_evidence = st.number_input(
+            "Top-K evidence passages per tradition",
+            min_value=1,
+            value=5,
+            step=1,
+            help=(
+                "How many passages to retrieve from each tradition "
+                "for each claim."
+            ),
+        )
+
+        if st.button("Analyse claims vs KB"):
+            ver_path = cfg.processed_dir / "VERIFICATION.jsonl"
+            claims_path = cfg.processed_dir / "CLAIMS.jsonl"
+
+            if not claims_path.exists():
+                st.error("CLAIMS.jsonl not found. Please run Step 3 first.")
+            else:
+                with st.spinner("Verifying claims against the KB…"):
+                    try:
+                        mc = None if max_claims == 0 else int(max_claims)
+                        ver_path, meta = verify_claims(
+                            cfg=cfg,
+                            max_claims=mc,
+                            top_k_evidence=int(top_k_evidence),
+                        )
+                    except Exception as e:
+                        st.error(f"Error during verification: {e}")
                     else:
-                        st.info("No verification records were produced.")
+                        st.success("Verification complete ✅")
+
+                        st.write("**Verification file:**", meta["verification_path"])
+                        st.write(
+                            "**Number of claims verified:**",
+                            meta["num_verifications"],
+                        )
+                        st.write("**Model:**", meta["model"])
+
+                        rows: List[Dict[str, Any]] = []
+                        with open(
+                            meta["verification_path"], "r", encoding="utf-8"
+                        ) as f:
+                            for i, line in enumerate(f):
+                                if i >= 50:
+                                    break
+                                rows.append(json.loads(line))
+                        if rows:
+                            st.subheader("Sample of verification results")
+                            df = pd.DataFrame(rows)
+
+                            show_cols = [
+                                "claim_id",
+                                "side",
+                                "verdict_overall",
+                                "verdict_islam",
+                                "verdict_christian",
+                                "confidence",
+                                "claim_text",
+                                "explanation",
+                            ]
+                            df_basic = df[[c for c in show_cols if c in df.columns]]
+                            st.dataframe(df_basic)
+
+                            # Detailed evidence view for first few claims
+                            st.subheader("Evidence details (first few claims)")
+                            for _, row in df.head(5).iterrows():
+                                header = (
+                                    f"{row.get('claim_id')} – "
+                                    f"{row.get('verdict_overall')} – "
+                                    f"{(row.get('claim_text') or '')[:80]}..."
+                                )
+                                with st.expander(header):
+                                    st.markdown("**Claim text (full):**")
+                                    st.write(row.get("claim_text", ""))
+
+                                    with st.expander(
+                                        "Explain key terms in this claim"
+                                    ):
+                                        render_glossary_for_claim(
+                                            row.get("claim_text", "")
+                                        )
+
+                                    st.markdown("---")
+                                    st.markdown("**Islamic evidence:**")
+                                    ev_islam = row.get("evidence_islam") or []
+                                    if not ev_islam:
+                                        st.write("_No Islamic evidence selected._")
+                                    else:
+                                        for ev in ev_islam:
+                                            st.write(
+                                                f"[{ev.get('id')}] "
+                                                f"{ev.get('ref') or ''} – "
+                                                f"{ev.get('text')}"
+                                            )
+
+                                    st.markdown("---")
+                                    st.markdown("**Christian evidence:**")
+                                    ev_christ = row.get("evidence_christian") or []
+                                    if not ev_christ:
+                                        st.write(
+                                            "_No Christian evidence selected._"
+                                        )
+                                    else:
+                                        for ev in ev_christ:
+                                            st.write(
+                                                f"[{ev.get('id')}] "
+                                                f"{ev.get('ref') or ''} – "
+                                                f"{ev.get('text')}"
+                                            )
+                        else:
+                            st.info("No verification records were produced.")
 
 
 if __name__ == "__main__":
