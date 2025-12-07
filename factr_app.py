@@ -18,7 +18,8 @@ from factr.asr import transcribe_audio
 from factr.claims import extract_claims
 from factr.verify import verify_claims
 from factr.kb import kb_commentary_for_group
-from factr.glossary import GLOSSARY
+#from factr.glossary import GLOSSARY
+from glossary import render_glossary_for_claim
 
 
 # =====================================================================
@@ -45,50 +46,50 @@ def lookup_word(word: str) -> Dict[str, Any]:
     }
 
 
-def render_glossary_for_claim(claim_text: str) -> None:
-    """
-    Scan the claim text, find words that exist in the GLOSSARY,
-    and render short explanations for each one.
-    """
-    if not claim_text:
-        st.write("No claim text available for this claim.")
-        return
+# def render_glossary_for_claim(claim_text: str) -> None:
+#     """
+#     Scan the claim text, find words that exist in the GLOSSARY,
+#     and render short explanations for each one.
+#     """
+#     if not claim_text:
+#         st.write("No claim text available for this claim.")
+#         return
 
-    # Extract simple word tokens
-    words = re.findall(r"[A-Za-z']+", claim_text)
-    seen = set()
-    found: List[Dict[str, Any]] = []
+#     # Extract simple word tokens
+#     words = re.findall(r"[A-Za-z']+", claim_text)
+#     seen = set()
+#     found: List[Dict[str, Any]] = []
 
-    for w in words:
-        key = w.lower()
-        if key in seen:
-            continue
-        seen.add(key)
+#     for w in words:
+#         key = w.lower()
+#         if key in seen:
+#             continue
+#         seen.add(key)
 
-        entry = GLOSSARY.get(key)
-        if entry:
-            found.append({"term": w, "entry": entry})
+#         entry = GLOSSARY.get(key)
+#         if entry:
+#             found.append({"term": w, "entry": entry})
 
-    if not found:
-        st.write("_No glossary entries found for this claim yet._")
-        return
+#     if not found:
+#         st.write("_No glossary entries found for this claim yet._")
+#         return
 
-    for item in found:
-        term = item["term"]
-        entry = item["entry"]
+#     for item in found:
+#         term = item["term"]
+#         entry = item["entry"]
 
-        st.markdown(f"**{term.lower()}**")
-        if isinstance(entry, dict):
-            definition = (
-                entry.get("definition")
-                or entry.get("text")
-                or entry.get("description")
-                or str(entry)
-            )
-            st.write(definition)
-        else:
-            st.write(str(entry))
-        st.markdown("---")
+#         st.markdown(f"**{term.lower()}**")
+#         if isinstance(entry, dict):
+#             definition = (
+#                 entry.get("definition")
+#                 or entry.get("text")
+#                 or entry.get("description")
+#                 or str(entry)
+#             )
+#             st.write(definition)
+#         else:
+#             st.write(str(entry))
+#         st.markdown("---")
 
 
 # =====================================================================
