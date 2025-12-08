@@ -18,9 +18,12 @@ from factr.asr import transcribe_audio
 from factr.claims import extract_claims
 from factr.verify import verify_claims
 from factr.kb import kb_commentary_for_group
-#from factr.glossary import GLOSSARY
-from glossary import render_glossary_for_claim
+# from factr.glossary import GLOSSARY
+# from glossary import render_glossary_for_claim
+from openai import OpenAI
 
+LOG_FILE = Path("factr_glossary_errors.log")
+_glossary_client = OpenAI()
 
 # =====================================================================
 # Glossary helpers
@@ -46,50 +49,115 @@ def lookup_word(word: str) -> Dict[str, Any]:
     }
 
 
-# def render_glossary_for_claim(claim_text: str) -> None:
-#     """
-#     Scan the claim text, find words that exist in the GLOSSARY,
-#     and render short explanations for each one.
-#     """
-#     if not claim_text:
-#         st.write("No claim text available for this claim.")
-#         return
+#Beginning of Edit – glossary helpers
 
-#     # Extract simple word tokens
-#     words = re.findall(r"[A-Za-z']+", claim_text)
-#     seen = set()
-#     found: List[Dict[str, Any]] = []
+# Create a dedicated OpenAI client for glossary generation
+#_glossary_client = OpenAI()
 
-#     for w in words:
-#         key = w.lower()
-#         if key in seen:
-#             continue
-#         seen.add(key)
 
-#         entry = GLOSSARY.get(key)
-#         if entry:
-#             found.append({"term": w, "entry": entry})
+def generate_glossary_for_claim(claim_text: str) -> dict:
+    """
+    Ask GPT to extract important technical/theological terms
+    from a claim and define them clearly.
 
-#     if not found:
-#         st.write("_No glossary entries found for this claim yet._")
-#         return
+    Returns a dict: { "term": "definition", ... }
+    """
+    claim_text = (claim_text or "").strip()
+    if not claim_text:
+        return {}
 
-#     for item in found:
-#         term = item["term"]
-#         entry = item["entry"]
+    # Prompt the model
+    system_msg = (
+        "You are a concise theological glossary assistant. "
+        "Given a short claim taken from a religious debate, "
+        "identify up to 6 important terms or short phrases "
+        "that an ordinary reader might not know. For each term, "
+        "give a clear 1–2 sentence definition in simple English. "
+        "Do not include citations or verse numbers unless they are "
+        "part of the term itself."
+    )
 
-#         st.markdown(f"**{term.lower()}**")
-#         if isinstance(entry, dict):
-#             definition = (
-#                 entry.get("definition")
-#                 or entry.get("text")
-#                 or entry.get("description")
-#                 or str(entry)
-#             )
-#             st.write(definition)
-#         else:
-#             st.write(str(entry))
-#         st.markdown("---")
+    user_msg = (
+        "Extract glossary terms from the following claim.\n\n"
+        "Return ONLY a JSON object mapping each term or short phrase "
+        "to its definition, for example:\n\n"
+        '{\n'
+        '  "term 1": "definition...",\n'
+        '  "term 2": "definition...",\n'
+        '  "term 3": "definition..."\n'
+        '}\n\n'
+        "If there are no specialist terms, return an empty JSON object: {}\n\n"
+        f"CLAIM:\n{claim_text}"
+    )
+
+    try:
+        # Use the stable Chat Completions JSON mode
+        resp = _glossary_client.chat.completions.create(
+            model="gpt-4.1-mini",  # or gpt-4o-mini if you prefer
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+
+        raw = (resp.choices[0].message.content or "").strip()
+        if not raw:
+            return {}
+
+        # Try to parse JSON directly
+        try:
+            data = json.loads(raw)
+        except Exception:
+            # Fallback: strip any ```json ... ``` fences if the model added them
+            m = re.search(r"\{.*\}", raw, flags=re.S)
+            if not m:
+                raise
+            data = json.loads(m.group(0))
+
+        if isinstance(data, dict):
+            # Normalise term keys a little
+            return {k.strip(): v for k, v in data.items() if k and k.strip()}
+
+        return {}
+
+    except Exception as e:
+        # Log the error but fail softly so the app keeps running
+        try:
+            with open(LOG_FILE, "a", encoding="utf-8") as log_f:
+                log_f.write(
+                    f"[{datetime.now().isoformat()}] "
+                    f"GLOSSARY_ERROR: {e}\n"
+                )
+        except Exception:
+            # If logging fails, just ignore – we still don't want to crash the app
+            pass
+
+        return {}
+
+
+
+def render_glossary_for_claim(claim_text: str) -> None:
+    """
+    Streamlit helper: render a glossary for a single claim.
+    """
+    terms = generate_glossary_for_claim(claim_text)
+
+    if not terms:
+        st.info(
+            "No glossary terms could be generated for this claim yet. "
+            "This may be due to a temporary issue calling the model."
+        )
+        return
+
+    for term, definition in terms.items():
+        st.markdown(f"**{term}**")
+        st.write(definition)
+        st.markdown("---")
+
+#end of Edit – glossary helpers
+
 
 
 # =====================================================================
