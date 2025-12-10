@@ -21,6 +21,8 @@ from factr.kb import kb_commentary_for_group
 # from factr.glossary import GLOSSARY
 # from glossary import render_glossary_for_claim
 from openai import OpenAI
+from ui_faq import render_faq
+
 
 LOG_FILE = Path("factr_glossary_errors.log")
 _glossary_client = OpenAI()
@@ -300,6 +302,7 @@ def evidence_heading_for_trad(trad_label: str, verdict: Optional[str]) -> str:
     return f"{trad_label} evidence {action}"
 
 
+
 # =====================================================================
 # Claim card renderer
 # =====================================================================
@@ -526,6 +529,11 @@ def main() -> None:
     st.set_page_config(page_title="FACTR – Debate Analyzer", layout="centered")
 
     st.title("FACTR – Debate Analyzer")
+
+    # Sidebar help / FAQ
+    with st.sidebar:
+        st.subheader("Help & FAQ")
+        render_faq()
 
     # Session state for cached results + run log
     if "last_results" not in st.session_state:
