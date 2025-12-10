@@ -143,7 +143,7 @@ The labels are deliberately phrased as “Agrees / Disagrees” because testers
         )
 
     # 5. Simple example (lay)
-    with st.expander("5. Example (non-technical)"):
+    with st.expander("5. Verdict - Example (non-technical)"):
         st.markdown(
             """
 **Claim (from a debate):**  
@@ -246,7 +246,7 @@ The UI pills are just a **human-friendly mapping** of these internal labels.
         )
 
     # 7. Full technical worked example
-    with st.expander("7. Full technical worked example"):
+    with st.expander("7. Verdict - Full technical worked example"):
         st.markdown(
             r"""
 Consider the claim:
