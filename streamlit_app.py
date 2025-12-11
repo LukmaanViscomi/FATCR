@@ -27,6 +27,24 @@ from ui_faq import render_faq
 LOG_FILE = Path("factr_glossary_errors.log")
 _glossary_client = OpenAI()
 
+#########################################
+# Streamlit adjustments                 #
+#########################################
+import os
+import streamlit as st
+
+# If we're running in Streamlit (cloud or local) and secrets has the key,
+# copy it into the environment so OpenAI() picks it up.
+if "OPENAI_API_KEY" in st.secrets:
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+
+from factr.config import FactrConfig
+from factr.ingest import ingest_youtube
+# and later, wherever you import from factr.claims
+
+##################################################################
+
+
 # =====================================================================
 # Glossary helpers
 # =====================================================================
