@@ -1,0 +1,8 @@
+streamlit
+openai>=1.0.0
+pandas
+numpy
+soundfile
+yt-dlp
+faster-whisper
+sentence-transformers
