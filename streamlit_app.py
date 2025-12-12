@@ -4,13 +4,23 @@ from pathlib import Path
 import json
 from typing import Any, Dict, Optional, List
 from datetime import datetime  # <- for logging timestamps
-
 import html
 import io
 import re
+import os
+import tempfile
 
 import pandas as pd
 import streamlit as st
+
+# ---- Streamlit secrets: OpenAI key + yt-dlp cookies ----
+if "OPENAI_API_KEY" in st.secrets:
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+
+YTDLP_COOKIES_PATH: Optional[Path] = None
+if "YTDLP_COOKIES" in st.secrets:
+    YTDLP_COOKIES_PATH = Path(tempfile.gettempdir()) / "yt_cookies.txt"
+    YTDLP_COOKIES_PATH.write_text(st.secrets["YTDLP_COOKIES"], encoding="utf-8")
 
 from factr.config import FactrConfig
 from factr.ingest import ingest_youtube
@@ -23,26 +33,9 @@ from factr.kb import kb_commentary_for_group
 from openai import OpenAI
 from ui_faq import render_faq
 
-
 LOG_FILE = Path("factr_glossary_errors.log")
 _glossary_client = OpenAI()
 
-#########################################
-# Streamlit adjustments                 #
-#########################################
-import os
-import streamlit as st
-
-# If we're running in Streamlit (cloud or local) and secrets has the key,
-# copy it into the environment so OpenAI() picks it up.
-if "OPENAI_API_KEY" in st.secrets:
-    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
-
-from factr.config import FactrConfig
-from factr.ingest import ingest_youtube
-# and later, wherever you import from factr.claims
-
-##################################################################
 
 
 # =====================================================================
@@ -641,7 +634,11 @@ def main() -> None:
             status.text("Step 1/4: Downloading & normalising audio…")
             log("Step 1/4 – ingest_youtube() starting.")
             try:
-                result = ingest_youtube(url_oneclick.strip(), cfg=cfg)
+                result = ingest_youtube(
+                    url_oneclick.strip(),
+                    cfg=cfg,
+                    cookies_path=str(YTDLP_COOKIES_PATH) if YTDLP_COOKIES_PATH else None,
+                )
                 log("Step 1/4 – ingest_youtube() completed successfully.")
             except Exception as e:
                 msg = f"Error during ingest: {e}"
@@ -836,7 +833,11 @@ def main() -> None:
             else:
                 with st.spinner("Downloading and processing audio…"):
                     try:
-                        snap = ingest_youtube(youtube_url.strip(), cfg=cfg)
+                        snap = ingest_youtube(
+                            youtube_url.strip(),
+                            cfg=cfg,
+                            cookies_path=str(YTDLP_COOKIES_PATH) if YTDLP_COOKIES_PATH else None,
+                        )
                     except Exception as e:
                         st.error(f"Error during ingest: {e}")
                     else:
