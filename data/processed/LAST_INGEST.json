@@ -1,10 +1,10 @@
 {
-  "run_id": "a90ea290",
-  "created_utc": "2025-11-30T23:30:44.162037Z",
-  "youtube_url": "https://youtu.be/3aAY01K4uaM?feature=shared",
-  "raw_audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\cf494f449a.webm",
-  "audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\a90ea290_16k_mono.wav",
+  "run_id": "1a14c0b1",
+  "created_utc": "2025-12-14T19:23:18.557241Z",
+  "youtube_url": "https://www.youtube.com/watch?v=PpvjOZ6BXL8&t=1s",
+  "raw_audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\c065d863cd.webm",
+  "audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\1a14c0b1_16k_mono.wav",
   "sample_rate": 16000,
   "channels": 1,
-  "duration_sec": 107.43875
+  "duration_sec": 158.53425
 }

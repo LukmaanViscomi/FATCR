@@ -25,6 +25,7 @@ from ui_faq import render_faq
 
 
 LOG_FILE = Path("factr_glossary_errors.log")
+FEEDBACK_FILE = Path("factr_verdict_feedback.jsonl")
 _glossary_client = OpenAI()
 
 # =====================================================================
@@ -138,6 +139,27 @@ def generate_glossary_for_claim(claim_text: str) -> dict:
 
         return {}
 
+def log_verdict_feedback(**fields: Any) -> None:
+    """
+    Append one feedback event to FEEDBACK_FILE as JSONL.
+
+    fields might include:
+      - claim_id, claim_text
+      - verdict_islam, verdict_christian, verdict_overall
+      - confidence
+      - reaction: "thumbs_up" / "thumbs_down"
+      - comment: optional free text
+    """
+    payload = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        **fields,
+    }
+    try:
+        with open(FEEDBACK_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        # feedback must never crash the app
+        pass
 
 
 def render_glossary_for_claim(claim_text: str) -> None:
@@ -403,6 +425,75 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
     if explanation:
         st.markdown("**Explanation**")
         st.markdown(explanation)
+    
+    # --- User feedback on this verdict --------------------------------------
+    feedback_key = f"feedback_claim_{rec.get('claim_id', idx)}"
+    with st.expander("Feedback on this verdict (optional)"):
+        st.markdown(
+            "Help improve FACTR by telling us whether this verdict seems reasonable. "
+            "Your feedback will be logged anonymously for research."
+        )
+
+        # Get current pilot ID (if set in sidebar)
+        user_tag = st.session_state.get("user_tag")
+
+        # Quick thumbs up / down
+        fb_cols = st.columns(2)
+        with fb_cols[0]:
+            if st.button("👍 Verdict seems reasonable", key=f"{feedback_key}_up"):
+                log_verdict_feedback(
+                    claim_id=rec.get("claim_id", idx),
+                    claim_text=claim_text,
+                    verdict_islam=verdict_islam,
+                    verdict_christian=verdict_christian,
+                    verdict_overall=verdict_overall,
+                    confidence=confidence,
+                    reaction="thumbs_up",
+                    comment=None,
+                    user_tag=user_tag,
+                )
+                st.success("Thanks – feedback recorded.")
+
+        with fb_cols[1]:
+            if st.button("👎 Verdict seems wrong / unclear", key=f"{feedback_key}_down"):
+                log_verdict_feedback(
+                    claim_id=rec.get("claim_id", idx),
+                    claim_text=claim_text,
+                    verdict_islam=verdict_islam,
+                    verdict_christian=verdict_christian,
+                    verdict_overall=verdict_overall,
+                    confidence=confidence,
+                    reaction="thumbs_down",
+                    comment=None,
+                    user_tag=user_tag,
+                )
+                st.success("Thanks – feedback recorded. "
+                           "You can also add a short comment below if you wish.")
+
+        # Always-available comment box
+        comment = st.text_area(
+            "Optional: what feels wrong or confusing about this verdict?",
+            key=f"{feedback_key}_comment",
+        )
+        if st.button("Submit comment", key=f"{feedback_key}_submit"):
+            cleaned = (comment or "").strip() or None
+            if cleaned:
+                log_verdict_feedback(
+                    claim_id=rec.get("claim_id", idx),
+                    claim_text=claim_text,
+                    verdict_islam=verdict_islam,
+                    verdict_christian=verdict_christian,
+                    verdict_overall=verdict_overall,
+                    confidence=confidence,
+                    reaction="comment",
+                    comment=cleaned,
+                    user_tag=user_tag,
+                )
+                st.success("Thanks – your comment was recorded.")
+            else:
+                st.info("Please type a comment before submitting, or just use the buttons above.")
+
+
 
     # --- Glossary for key terms in this claim -------------------------------
     with st.expander("Explain key terms in this claim (glossary)"):
@@ -534,6 +625,9 @@ def main() -> None:
     with st.sidebar:
         st.subheader("Help & FAQ")
         render_faq()
+    # Pilot testing: capture user ID
+    user_tag = st.text_input("Pilot ID (e.g. S1, S2)", value="", max_chars=10)
+    st.session_state["user_tag"] = user_tag.strip() or None
 
     # Session state for cached results + run log
     if "last_results" not in st.session_state:
