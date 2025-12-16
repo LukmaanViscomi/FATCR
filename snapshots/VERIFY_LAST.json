@@ -1,0 +1,8 @@
+{
+  "verification_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\VERIFICATION.jsonl",
+  "num_verifications": 8,
+  "max_claims": null,
+  "top_k_evidence": 5,
+  "model": "gpt-4.1-mini",
+  "created_utc": "2025-12-16T15:16:17.442863Z"
+}

@@ -1,0 +1,13 @@
+timestamp,claim_id,claim_text,verdict_islam,verdict_christian,verdict_overall,confidence,reaction,comment,user_tag
+2025-12-12 11:42:05,8ba76dad_000,"According to Jesus, the true God is three persons in one.",disagrees,agrees,conflicted,0.9,thumbs_up,,lukmaan
+2025-12-12 11:43:33,8ba76dad_001,Jesus is all three persons of the true God.,disagrees,agrees,conflicted,0.9,thumbs_up,,lukmaan
+2025-12-12 11:53:11,8ba76dad_000,"According to Jesus, the true God is three persons in one.",disagrees,agrees,conflicted,0.9,thumbs_up,,lukmaan
+2025-12-12 11:54:40,8ba76dad_000,"According to Jesus, the true God is three persons in one.",disagrees,agrees,conflicted,0.9,thumbs_down,does not make sense because the bible verses are wrong,lukmaan
+2025-12-12 11:55:48,8ba76dad_001,Jesus is all three persons of the true God.,disagrees,agrees,conflicted,0.9,thumbs_down,ok but needs enhancing,lukmaan
+2025-12-12 11:56:30,8ba76dad_002,People should worship God instead of any creation.,agrees,agrees,agreement,0.9,thumbs_up,,lukmaan
+2025-12-13 14:20:47,8f2858f0_001,Jesus is all three persons of the true God.,disagrees,agrees,conflicted,0.9,thumbs_up,,tester-1
+2025-12-13 14:21:28,8f2858f0_001,Jesus is all three persons of the true God.,disagrees,agrees,conflicted,0.9,comment,makes sense! thanks,tester-1
+2025-12-13 14:21:55,8f2858f0_002,"Jesus is my friend, counselor, and listener who speaks to me in my heart.",insufficient,agrees,agreement,0.8,thumbs_down,,tester-1
+2025-12-13 14:23:11,8f2858f0_002,"Jesus is my friend, counselor, and listener who speaks to me in my heart.",insufficient,agrees,agreement,0.8,comment,the sharia would dictate that Jesus ibn Marriam has no ability to communicate with anyone from the 5th heaven,tester-1
+2025-12-13 14:23:59,8f2858f0_003,God speaks to me through Jesus.,disagrees,agrees,conflicted,0.9,thumbs_up,,tester-1
+2025-12-13 14:24:10,8f2858f0_003,God speaks to me through Jesus.,disagrees,agrees,conflicted,0.9,comment,this is well stated,tester-1

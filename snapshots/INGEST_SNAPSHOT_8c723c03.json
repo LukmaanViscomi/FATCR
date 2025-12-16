@@ -1,0 +1,10 @@
+{
+  "run_id": "8c723c03",
+  "created_utc": "2025-11-19T21:23:32.130078Z",
+  "youtube_url": "https://www.youtube.com/watch?v=ZQTQ7V2MLL0",
+  "raw_audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\aacb2102bc.webm",
+  "audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\8c723c03_16k_mono.wav",
+  "sample_rate": 16000,
+  "channels": 1,
+  "duration_sec": 497.5804375
+}

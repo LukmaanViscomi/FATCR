@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple
 from datetime import datetime  # <- for logging timestamps
 
 import html
@@ -11,6 +11,7 @@ import re
 
 import pandas as pd
 import streamlit as st
+import uuid
 
 from factr.config import FactrConfig
 from factr.ingest import ingest_youtube
@@ -18,7 +19,6 @@ from factr.asr import transcribe_audio
 from factr.claims import extract_claims
 from factr.verify import verify_claims
 from factr.kb import kb_commentary_for_group
-# from factr.glossary import GLOSSARY
 # from glossary import render_glossary_for_claim
 from openai import OpenAI
 from ui_faq import render_faq
@@ -28,35 +28,15 @@ LOG_FILE = Path("factr_glossary_errors.log")
 FEEDBACK_FILE = Path("factr_verdict_feedback.jsonl")
 _glossary_client = OpenAI()
 
+# create and store the config once
+def get_cfg() -> FactrConfig:
+    if "cfg" not in st.session_state:
+        st.session_state["cfg"] = FactrConfig()
+    return st.session_state["cfg"]
+
 # =====================================================================
 # Glossary helpers
 # =====================================================================
-
-def lookup_word(word: str) -> Dict[str, Any]:
-    """
-    Look up a word in the local glossary and build some helpful links.
-
-    - word: the original token from the text (can include punctuation)
-    - returns a dict with:
-        - 'word': original word
-        - 'glossary': entry from GLOSSARY (or None)
-        - 'wiktionary_url': link to Wiktionary
-        - 'wikipedia_url': link to Wikipedia (best-effort)
-    """
-    key = word.lower().strip(".,!?;:\"'()[]")
-    return {
-        "word": word,
-        "glossary": GLOSSARY.get(key),
-        "wiktionary_url": f"https://en.wiktionary.org/wiki/{key}",
-        "wikipedia_url": f"https://en.wikipedia.org/wiki/{key.capitalize()}",
-    }
-
-
-#Beginning of Edit – glossary helpers
-
-# Create a dedicated OpenAI client for glossary generation
-#_glossary_client = OpenAI()
-
 
 def generate_glossary_for_claim(claim_text: str) -> dict:
     """
@@ -179,9 +159,6 @@ def render_glossary_for_claim(claim_text: str) -> None:
         st.markdown(f"**{term}**")
         st.write(definition)
         st.markdown("---")
-
-#end of Edit – glossary helpers
-
 
 
 # =====================================================================
@@ -326,6 +303,275 @@ def evidence_heading_for_trad(trad_label: str, verdict: Optional[str]) -> str:
 
 
 # =====================================================================
+# Timestamp helpers
+# =====================================================================
+
+def _fmt_hms(seconds: Optional[float]) -> str:
+    """Format seconds as H:MM:SS or M:SS. Returns '' if seconds is None."""
+    if seconds is None:
+        return ""
+    try:
+        s = float(seconds)
+    except Exception:
+        return ""
+    if s < 0:
+        s = 0.0
+    total = int(round(s))
+    h = total // 3600
+    m = (total % 3600) // 60
+    sec = total % 60
+    if h > 0:
+        return f"{h}:{m:02d}:{sec:02d}"
+    return f"{m}:{sec:02d}"
+
+
+def _coerce_time_seconds(v: Any) -> Optional[float]:
+    """Coerce possible time formats into seconds."""
+    if v is None:
+        return None
+    # already numeric
+    try:
+        fv = float(v)
+    except Exception:
+        # strings like "00:01:23" or "1:23"
+        if isinstance(v, str) and ":" in v:
+            parts = [p.strip() for p in v.split(":")]
+            try:
+                nums = [float(p) for p in parts]
+            except Exception:
+                return None
+            if len(nums) == 3:
+                h, m, s = nums
+                return h * 3600 + m * 60 + s
+            if len(nums) == 2:
+                m, s = nums
+                return m * 60 + s
+        return None
+    # if looks like ms
+    if fv > 10_000:  # > ~2.7h in seconds, likely ms
+        return fv / 1000.0
+    return fv
+
+def load_claim_time_cache(processed_dir: Path) -> Dict[str, Tuple[Optional[float], Optional[float]]]:
+    """
+    Build a claim_id -> (start_sec, end_sec) cache.
+
+    FACTR claim artefacts can store time in two ways:
+      1) direct numeric fields (t_start/t_end, start/end, etc.)
+      2) an utterance index span (utterance_range=[i0,i1]) which must be resolved
+         via UTTERANCES.parquet (utterance i -> start/end seconds).
+
+    The app uses this cache to show timestamps in the UI and include them in CSV exports.
+    Best-effort: if dependencies for reading parquet are missing, we fall back to whatever
+    time fields exist in the claim artefacts.
+    """
+    candidates = [
+        processed_dir / "CLAIMS_raw.jsonl",
+        processed_dir / "CLAIMS.jsonl",
+        processed_dir / "CLAIMS_extracted.jsonl",
+        processed_dir / "CLAIMS_raw.json",
+        processed_dir / "CLAIMS.json",
+    ]
+
+    # Optional utterance timeline (index -> start/end sec)
+    utterances_fp = processed_dir / "UTTERANCES.parquet"
+    utter_df = None
+    start_col = end_col = None
+    if utterances_fp.exists():
+        try:
+            import pandas as _pd  # noqa: F401
+            # pandas parquet requires pyarrow or fastparquet in most environments
+            utter_df = _pd.read_parquet(utterances_fp)
+            cols = [c.lower() for c in utter_df.columns]
+            # common column name variants
+            def _pick(col_candidates):
+                for cand in col_candidates:
+                    if cand in cols:
+                        return utter_df.columns[cols.index(cand)]
+                return None
+            start_col = _pick(["start", "start_time", "start_sec", "t_start", "start_s"])
+            end_col   = _pick(["end", "end_time", "end_sec", "t_end", "end_s"])
+            # if we can't detect, treat as unavailable
+            if start_col is None or end_col is None:
+                utter_df = None
+        except Exception:
+            utter_df = None
+
+    cache: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+
+    def _store(cid: Any, t0: Optional[float], t1: Optional[float], claim_text: Any = None) -> None:
+        """Store by claim_id and (optionally) by normalised claim text."""
+        if cid is not None:
+            cache[str(cid)] = (t0, t1)
+        # secondary key: normalised claim text (helps when claim_id formats differ across stages)
+        key_txt = _norm_claim_text(claim_text)
+        if key_txt:
+            cache[f"txt:{key_txt}"] = (t0, t1)
+
+    for fp in candidates:
+        if not fp.exists():
+            continue
+        try:
+            if fp.suffix.lower() == ".jsonl":
+                lines = fp.read_text(encoding="utf-8").splitlines()
+                items = []
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        items.append(json.loads(line))
+                    except Exception:
+                        continue
+            else:
+                obj = json.loads(fp.read_text(encoding="utf-8"))
+                items = obj if isinstance(obj, list) else (obj.get("claims") or [])
+
+            for obj in items:
+                cid = obj.get("claim_id") or obj.get("id") or obj.get("claim_idx")
+                # 1) direct timestamps
+                t0 = _coerce_time_seconds(
+                    obj.get("t_start") or obj.get("start") or obj.get("start_time") or obj.get("start_sec") or
+                    (obj.get("provenance") or {}).get("start") or (obj.get("provenance") or {}).get("start_sec")
+                )
+                t1 = _coerce_time_seconds(
+                    obj.get("t_end") or obj.get("end") or obj.get("end_time") or obj.get("end_sec") or
+                    (obj.get("provenance") or {}).get("end") or (obj.get("provenance") or {}).get("end_sec")
+                )
+
+                # 2) resolve utterance_range using UTTERANCES.parquet (if available)
+                if (t0 is None or t1 is None) and utter_df is not None:
+                    ur = obj.get("utterance_range") or (obj.get("provenance") or {}).get("utterance_range")
+                    if isinstance(ur, (list, tuple)) and len(ur) == 2:
+                        try:
+                            i0 = int(ur[0])
+                            i1 = int(ur[1])
+                            # treat i1 as inclusive (safer for [0,24] style ranges)
+                            lo = max(0, min(i0, i1))
+                            hi = max(0, max(i0, i1))
+                            hi = min(hi, len(utter_df) - 1)
+                            span = utter_df.iloc[lo:hi+1]
+                            t0 = _coerce_time_seconds(span.iloc[0][start_col])
+                            t1 = _coerce_time_seconds(span.iloc[-1][end_col])
+                        except Exception:
+                            pass
+
+                _store(cid, t0, t1, claim_text=obj.get('claim_text') or obj.get('text') or obj.get('claim'))
+
+        except Exception:
+            continue
+
+        # Prefer the first artefact found that yields any timestamps.
+        if cache:
+            break
+
+    return cache
+
+def extract_claim_times(rec: Dict[str, Any], time_cache: Optional[Dict[Any, Tuple[Optional[float], Optional[float]]]] = None) -> Tuple[Optional[float], Optional[float]]:
+    """Best-effort extraction of start/end time fields from a verification record."""
+    # Common field names across pipelines/notebooks
+    start_keys = ["t_start", "claim_start_sec", "claim_start", "start_sec", "start_seconds", "start", "start_time", "utterance_start"]
+    end_keys = ["t_end", "claim_end_sec", "claim_end", "end_sec", "end_seconds", "end", "end_time", "utterance_end"]
+
+    def _from_dict(d: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
+        t0 = next((_coerce_time_seconds(d.get(k)) for k in start_keys if d.get(k) is not None), None)
+        t1 = next((_coerce_time_seconds(d.get(k)) for k in end_keys if d.get(k) is not None), None)
+        return t0, t1
+
+    t0, t1 = _from_dict(rec)
+
+    # nested provenance/meta
+    if t0 is None and t1 is None:
+        for nk in ["provenance", "claim_provenance", "claim_meta", "meta", "metadata"]:
+            nd = rec.get(nk)
+            if isinstance(nd, dict):
+                t0, t1 = _from_dict(nd)
+                if t0 is not None or t1 is not None:
+                    break
+
+    # time cache lookup by claim_id
+    if (t0 is None and t1 is None) and time_cache:
+        # 1) primary key: claim_id
+        cid = rec.get("claim_id") or rec.get("id") or rec.get("claim_idx")
+        if cid is not None:
+            key = str(cid)
+            if key in time_cache:
+                t0, t1 = time_cache[key]
+
+        # 2) fallback key: normalised claim text (helps when IDs are regenerated)
+        if (t0 is None and t1 is None):
+            ctext = rec.get("claim_text") or rec.get("claim") or rec.get("text")
+            tkey = _norm_claim_text(ctext)
+            if tkey:
+                k2 = f"txt:{tkey}"
+                if k2 in time_cache:
+                    t0, t1 = time_cache[k2]
+
+
+    return t0, t1
+
+def claim_time_label(rec: Dict[str, Any], time_cache: Optional[Dict[Any, Tuple[Optional[float], Optional[float]]]] = None) -> str:
+    t0, t1 = extract_claim_times(rec, time_cache=time_cache)
+    a = _fmt_hms(t0)
+    b = _fmt_hms(t1)
+    if a and b:
+        return f"{a}–{b}"
+    if a:
+        return a
+    return ""
+
+
+def pretty_source(src: str) -> str:
+    """
+    Convert internal dataset/source identifiers into user-facing references.
+    - strips local path prefixes (e.g. 'spa5k/')
+    - removes '(local mirror)'
+    - keeps the most informative tail component
+    """
+    if not src:
+        return ""
+    s = str(src)
+    s = s.replace("(local mirror)", "").strip()
+    s = re.sub(r"\s+", " ", s).strip()
+    # drop leading path components
+    if "/" in s:
+        s = s.split("/")[-1]
+    # common normalisations
+    s = s.replace("tafsir_api", "Tafsir (source)")  # neutral, still honest
+    return s.strip()
+
+def clean_reference(ref: str) -> str:
+    """Remove internal dataset/debug fragments from a reference string."""
+    if not ref:
+        return ""
+    r = str(ref)
+    # Remove internal parentheses like "(spa5k/tafsir_api (local mirror))"
+    r = re.sub(r"\s*\([^)]*(local mirror|tafsir_api|spa5k|semarketi|quranjson)[^)]*\)\s*", " ", r, flags=re.IGNORECASE)
+    r = re.sub(r"\s+", " ", r).strip()
+    return r
+
+
+def _norm_claim_text(s: Any) -> str:
+    """Normalise claim text for fuzzy key matching (best-effort)."""
+    if not s:
+        return ""
+    t = str(s).strip().lower()
+    # collapse whitespace
+    t = re.sub(r"\s+", " ", t)
+    # remove most punctuation (keep apostrophes inside words)
+    t = re.sub(r"[^a-z0-9\s']", "", t)
+    return t
+
+
+def render_plain_text_block(text: str) -> None:
+    """Render text without Markdown interpretation (avoids accidental code/highlight colours)."""
+    if not text:
+        return
+    safe = html.escape(text)
+    st.markdown(f"<div style='white-space:pre-wrap;font-family:inherit;line-height:1.45'>{safe}</div>", unsafe_allow_html=True)
+
+
+# =====================================================================
 # Claim card renderer
 # =====================================================================
 
@@ -351,6 +597,12 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
 
     # --- Claim header -------------------------------------------------------
     st.markdown(f"### Claim {idx + 1}")
+
+    # Timestamp (if available)
+    ts = rec.get("claim_time") or claim_time_label(rec)
+    if ts:
+        st.caption(f"🕒 {ts}")
+
     st.markdown(f"**{claim_text}**")
 
     # --- Verdict row: Islamic / Christian / Both / Confidence ---------------
@@ -494,7 +746,6 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                 st.info("Please type a comment before submitting, or just use the buttons above.")
 
 
-
     # --- Glossary for key terms in this claim -------------------------------
     with st.expander("Explain key terms in this claim (glossary)"):
         render_glossary_for_claim(claim_text)
@@ -509,11 +760,16 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
         with st.expander(heading_islam):
             for ev in evidence_islam:
                 ev_id = ev.get("id")
-                ref = ev.get("ref") or ""
+                ref = clean_reference(ev.get("ref") or "")
                 text = ev.get("text") or ""
                 label = f"[Islamic {ev_id}]" if ev_id is not None else "[Islamic]"
 
-                st.markdown(f"- **{label} {ref}** – {text}")
+                src = pretty_source(ev.get("source") or ev.get("dataset") or ev.get("collection") or "")
+                page = ev.get("page") or ev.get("page_no") or ev.get("loc") or ""
+                src_bits = " | ".join([b for b in [src, (f"p.{page}" if page else "")] if b])
+                src_str = f" _({src_bits})_" if src_bits else ""
+                st.markdown(f"- **{label} {ref}**{src_str}")
+                render_plain_text_block(text)
 
                 group_key = ev.get("group_key")
                 if group_key:
@@ -528,7 +784,11 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                                 c_ref = c.ref or ""
                                 c_text = c.text or ""
 
-                                st.markdown(f"**{c_ref}**")
+                                c_src = pretty_source(getattr(c, "source", "") or getattr(c, "dataset", "") or "")
+                                c_page = getattr(c, "page", "") or getattr(c, "page_no", "") or ""
+                                c_bits = " | ".join([b for b in [c_src, (f"p.{c_page}" if c_page else "")] if b])
+                                c_hdr = f"{c_ref}" + (f" ({c_bits})" if c_bits else "")
+                                st.markdown(f"**{c_hdr}**")
                                 st.markdown(
                                     "<div style='white-space:pre-wrap;font-size:0.95rem;'>"
                                     + html.escape(c_text or "")
@@ -545,11 +805,16 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
         with st.expander(heading_christ):
             for ev in evidence_christ:
                 ev_id = ev.get("id")
-                ref = ev.get("ref") or ""
+                ref = clean_reference(ev.get("ref") or "")
                 text = ev.get("text") or ""
                 label = f"[Christian {ev_id}]" if ev_id is not None else "[Christian]"
 
-                st.markdown(f"- **{label} {ref}** – {text}")
+                src = pretty_source(ev.get("source") or ev.get("dataset") or ev.get("collection") or "")
+                page = ev.get("page") or ev.get("page_no") or ev.get("loc") or ""
+                src_bits = " | ".join([b for b in [src, (f"p.{page}" if page else "")] if b])
+                src_str = f" _({src_bits})_" if src_bits else ""
+                st.markdown(f"- **{label} {ref}**{src_str}")
+                render_plain_text_block(text)
 
                 group_key = ev.get("group_key")
                 if group_key:
@@ -566,7 +831,11 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                                 c_ref = c.ref or ""
                                 c_text = c.text or ""
 
-                                st.markdown(f"**{c_ref}**")
+                                c_src = pretty_source(getattr(c, "source", "") or getattr(c, "dataset", "") or "")
+                                c_page = getattr(c, "page", "") or getattr(c, "page_no", "") or ""
+                                c_bits = " | ".join([b for b in [c_src, (f"p.{c_page}" if c_page else "")] if b])
+                                c_hdr = f"{c_ref}" + (f" ({c_bits})" if c_bits else "")
+                                st.markdown(f"**{c_hdr}**")
                                 st.markdown(
                                     "<div style='white-space:pre-wrap;font-size:0.95rem;'>"
                                     + html.escape(c_text or "")
@@ -584,16 +853,42 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
 # Render helper for one-click results
 # =====================================================================
 
-def render_oneclick_results(rows: List[Dict[str, Any]]) -> None:
+def render_oneclick_results(rows: List[Dict[str, Any]], cfg: Optional["FactrConfig"] = None) -> None:
     """
-    Render the 'Debate analysis – claims and verdicts' section
+    Render the \'Debate analysis – claims and verdicts\' section
     (table download + per-claim cards) from a list of verification rows.
     """
     if not rows:
         st.info("No verification records were produced.")
         return
 
-    df = pd.DataFrame(rows)
+    # Build a claim_id -> (start,end) cache from any available claim artefact
+    time_cache = None
+    try:
+        if cfg is not None:
+            time_cache = load_claim_time_cache(cfg.processed_dir)
+    except Exception:
+        time_cache = None
+
+    # Add timestamp fields (best-effort) so they appear both on-screen and in the CSV
+    rows_out: List[Dict[str, Any]] = []
+    for rec in rows:
+        rec2 = dict(rec)
+        t0, t1 = extract_claim_times(rec, time_cache=time_cache)
+        rec2["claim_start_sec"] = t0
+        rec2["claim_end_sec"] = t1
+        rec2["claim_time"] = claim_time_label(rec, time_cache=time_cache)
+        rows_out.append(rec2)
+
+    df = pd.DataFrame(rows_out)
+
+    # Persist last results so mobile refresh / reconnect can still display them
+    try:
+        if cfg is not None:
+            last_fp = cfg.processed_dir / f"STREAMLIT_LAST_RESULTS_{st.session_state.get('session_id', 'nosid')}.json"
+            last_fp.write_text(json.dumps(rows_out, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 
     st.subheader("Debate analysis – claims and verdicts")
 
@@ -608,7 +903,7 @@ def render_oneclick_results(rows: List[Dict[str, Any]]) -> None:
 
     st.markdown("")
 
-    for idx, rec in enumerate(rows):
+    for idx, rec in enumerate(rows_out):
         render_claim_card(idx, rec)
 
 
@@ -619,15 +914,47 @@ def render_oneclick_results(rows: List[Dict[str, Any]]) -> None:
 def main() -> None:
     st.set_page_config(page_title="FACTR – Debate Analyzer", layout="centered")
 
+    # Style: make the main Analyse button red (primary buttons only)
+    st.markdown("""
+    <style>
+    button[data-testid="baseButton-primary"] {
+        background-color: #d32f2f !important;
+        border: 1px solid #d32f2f !important;
+        color: white !important;
+    }
+    button[data-testid="baseButton-primary"]:hover {
+        background-color: #b71c1c !important;
+        border: 1px solid #b71c1c !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.title("FACTR – Debate Analyzer")
+
+    # -----------------------------------------------------------------
+    # Per-user session ID (prevents users seeing each other's last run)
+    # Persisted in the URL so iOS refreshes keep the same session.
+    # -----------------------------------------------------------------
+    try:
+        sid = st.query_params.get("sid", None)
+    except Exception:
+        sid = None
+
+    if not sid:
+        sid = uuid.uuid4().hex
+        try:
+            st.query_params["sid"] = sid
+        except Exception:
+            pass
+
+    st.session_state["session_id"] = sid
+
 
     # Sidebar help / FAQ
     with st.sidebar:
         st.subheader("Help & FAQ")
         render_faq()
-    # Pilot testing: capture user ID
-    user_tag = st.text_input("Pilot ID (e.g. S1, S2)", value="", max_chars=10)
-    st.session_state["user_tag"] = user_tag.strip() or None
+
 
     # Session state for cached results + run log
     if "last_results" not in st.session_state:
@@ -635,8 +962,18 @@ def main() -> None:
     if "run_log" not in st.session_state:
         st.session_state["run_log"] = []
 
-    cfg = FactrConfig()
+    # IMPORTANT: use the session config (do NOT recreate a new FactrConfig)
+    cfg = st.session_state.get("cfg", FactrConfig())
     log_file = cfg.processed_dir / "ONECLICK_RUN.log"
+
+    # If the browser refreshed (common on iOS), try to recover the last completed results
+    if st.session_state.get("last_results") is None:
+        try:
+            last_fp = cfg.processed_dir / f"STREAMLIT_LAST_RESULTS_{st.session_state.get('session_id', 'nosid')}.json"
+            if last_fp.exists():
+                st.session_state["last_results"] = json.loads(last_fp.read_text(encoding="utf-8"))
+        except Exception:
+            pass
 
     # Simple helper to log messages both to session_state and to file
     def log(msg: str) -> None:
@@ -647,7 +984,6 @@ def main() -> None:
             with log_file.open("a", encoding="utf-8") as f:
                 f.write(line + "\n")
         except Exception:
-            # Logging failure should never crash the app
             pass
 
     # ======================================================
@@ -667,33 +1003,71 @@ def main() -> None:
         placeholder="https://www.youtube.com/watch?v=...",
     )
 
+    
+    # Pilot testing: capture user ID (optional)
+    user_tag = st.text_input("Pilot ID (e.g. S1, S2)", value="", max_chars=10, key="pilot_id")
+    st.session_state["user_tag"] = (user_tag or "").strip() or None
+
+    # Runtime / cost controls (defaults: 2, 5, 5, 0.55)
+    if "ui_defaults" not in st.session_state:
+        st.session_state["ui_defaults"] = {"max_chunks": 2, "max_claims": 5, "top_k": 5, "min_similarity": 0.55}
+
+    d = st.session_state["ui_defaults"]
+
     col1, col2, col3 = st.columns(3)
     with col1:
         max_chunks_all = st.number_input(
             "Max transcript chunks (0 = all)",
             min_value=0,
-            value=2,
+            max_value=200,
+            value=int(d["max_chunks"]),
             step=1,
-            help="Limit chunks for claim extraction while testing.",
+            help="Limits how much transcript is processed (runtime/cost control).",
+            key="max_chunks_all",
         )
     with col2:
         max_claims_all = st.number_input(
             "Max claims to verify (0 = all)",
             min_value=0,
-            value=5,
+            max_value=300,
+            value=int(d["max_claims"]),
             step=1,
-            help="Limit number of claims analysed to control API cost.",
+            help="Caps how many extracted claims are verified (runtime/cost control).",
+            key="max_claims_all",
         )
     with col3:
         top_k_all = st.number_input(
             "Top-K evidence per tradition",
             min_value=1,
-            value=5,
+            max_value=20,
+            value=int(d["top_k"]),
             step=1,
             help="How many KB passages to retrieve for each claim.",
+            key="top_k_all",
         )
 
-    analyse_button = st.button("Analyse debate (end-to-end)")
+    min_similarity_floor = st.slider(
+        "Min similarity floor",
+        min_value=0.0,
+        max_value=1.0,
+        value=float(d["min_similarity"]),
+        step=0.01,
+        help="Evidence below this similarity is treated as weak/ignored.",
+        key="min_similarity_floor",
+    )
+
+    def _reset_ui_defaults() -> None:
+        st.session_state["ui_defaults"] = {"max_chunks": 2, "max_claims": 5, "top_k": 5, "min_similarity": 0.55}
+        # Reset widget-backed values (safe inside callback)
+        st.session_state["max_chunks_all"] = 2
+        st.session_state["max_claims_all"] = 5
+        st.session_state["top_k_all"] = 5
+        st.session_state["min_similarity_floor"] = 0.55
+
+    st.button("Reset settings to defaults", key="reset_ui_defaults", on_click=_reset_ui_defaults)
+
+
+    analyse_button = st.button("Analyse debate (end-to-end)", type="primary")
 
     if analyse_button:
         if not url_oneclick.strip():
@@ -867,13 +1241,13 @@ def main() -> None:
                     log("Verification file contained no rows.")
                 else:
                     st.session_state["last_results"] = rows
-                    render_oneclick_results(rows)
+                    render_oneclick_results(rows, cfg=cfg)
 
     # If we have previous results and the button is NOT pressed on this rerun,
     # show the cached results so the page does not "forget" everything.
     if not analyse_button and st.session_state.get("last_results"):
         st.markdown("---")
-        render_oneclick_results(st.session_state["last_results"])
+        render_oneclick_results(st.session_state["last_results"], cfg=cfg)
 
     # Show processing log (for this session)
     with st.expander("View processing log (this session)", expanded=False):

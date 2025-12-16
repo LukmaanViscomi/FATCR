@@ -1,98 +1,69 @@
-# === FACTR Project .gitignore ===
+###########################################################
+# Generic Python / Streamlit project ignores
+###########################################################
 
-# 1) Raw & scratch (never commit)
-data/raw/**
-runs/
-*.tmp
-*.log
-
-# 2) Snapshots (large) — ignore by default, but allow manifests
-snapshots/**
-!snapshots/**/_MANIFEST.json
-
-# 3) Jupyter cache
-.ipynb_checkpoints/
-.ipynb_convert/
-*.ipynb~
-*.bak
-
-# 4) Python cache
+# Byte-compiled / optimized / DLL files
 __pycache__/
-.venv/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-*.pkl
+*.so
+*.dll
 
-# 5) OS / editor clutter
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# OS / editor junk
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
+*.tmp
+*.bak
+*.orig
 
-# 6) Generic large formats (ignored globally)…
-*.wav
-*.mp3
-*.flac
-*.jsonl
-*.json
-*.npy
-*.npz
-*.parquet
-*.faiss
-*.csv
+# IDE settings
+.vscode/
+.idea/
+*.code-workspace
 
-# 7) …but always ALLOW anything under data/processed/
-!data/processed/**
-!data/processed/**/*.jsonl
-!data/processed/**/*.json
-!data/processed/**/*.npy
-!data/processed/**/*.npz
-!data/processed/**/*.parquet
-!data/processed/**/*.faiss
-!data/processed/**/*.csv
+# Logs / caches
+logs/
+log/
+*.log
+tmp/
+temp/
+.cache/
+*.pid
 
-# Python / venv
-.venv/
-__pycache__/
-*.pyc
 
-# Streamlit / local env
-.streamlit/
+###########################################################
+# FACTR-specific: generated data and artefacts
+###########################################################
+
+# All raw + processed data are pipeline output
+data/raw/
+data/processed/
+
+# Any other scratch / output dirs you might add
+scratch/
+outputs/
+checkpoints/
+
+# Local-only config / secrets (never commit)
+.streamlit/secrets.toml
+*.env
 .env
-
-# Audio / video and large media from ingest
-data/processed/*.webm
-data/processed/*_mono.wav
-data/processed/*.mp3
-data/processed/*.mp4
-
-# KB artifacts - large, can be rebuilt
-data/processed/KB_passages.jsonl
-data/processed/KB_embeddings.npy
-data/processed/KB_all.faiss
-data/processed/KB_islam.faiss
-data/processed/KB_christian.faiss
-data/processed/LAST_KB.json
-
-# Run-specific outputs (can be regenerated)
-data/processed/CLAIMS.jsonl
-data/processed/VERIFICATION.jsonl
-data/processed/UTTERANCES.parquet
-snapshots/
-
-# 8) Streamlit & local config
-.streamlit/
-.env
-
-# 9) Audio / video / big artifacts
-data/processed/*.wav
-data/processed/*.mp3
-data/processed/*.mp4
-data/processed/*_mono.wav
-
-# 9) Large media from ingest
-data/processed/*.webm
-data/processed/*_mono.wav
-data/processed/*.mp3
-data/processed/*.mp4
+.env.*

@@ -1,0 +1,10 @@
+{
+  "run_id": "f261a1ec",
+  "created_utc": "2025-11-24T12:25:27.551414Z",
+  "youtube_url": "https://www.youtube.com/watch?v=gTsUqDrnmaA",
+  "raw_audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\4de6aae418.webm",
+  "audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\f261a1ec_16k_mono.wav",
+  "sample_rate": 16000,
+  "channels": 1,
+  "duration_sec": 576.0058125
+}

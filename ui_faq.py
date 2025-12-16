@@ -496,5 +496,27 @@ In summary:
 They are there to let you **control runtime and cost** without changing the underlying
 scoring logic.
 """
-
         )
+    with st.expander("What does the 'Min similarity floor' control do?"):
+        st.markdown(
+            """
+    **In simple terms:**  
+    It stops FACTR from showing *weak* evidence that only loosely matches the claim.
+
+    **What it affects:**  
+    - FACTR retrieves passages by semantic similarity (how close the meaning is).
+    - If a retrieved passage scores **below** the *Min similarity floor*, it is treated as **too weak / unreliable** to count as evidence.
+
+    **Why this matters:**  
+    Without a floor, the system may “grab something” even when your Knowledge Base doesn't really contain relevant material
+    (e.g., returning a random verse for an obscure historical/library claim).  
+    A similarity floor helps reduce those misleading matches and increases the chance that low-coverage claims end up as **Insufficient** instead.
+
+    **How to use it (rule of thumb):**  
+    - **Lower (e.g., 0.45–0.55):** more evidence shown, but more risk of weak/irrelevant passages.  
+    - **Higher (e.g., 0.60–0.75):** stricter evidence, fewer false matches, but more “Insufficient”.
+
+    Recommended starting point: **0.55**.
+    """
+        )
+
