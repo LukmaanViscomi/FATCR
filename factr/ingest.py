@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -33,6 +34,8 @@ def _download_audio_with_yt_dlp(
         "outtmpl": out_tmpl,
         "quiet": True,
     }
+
+    # If we have a cookies file, pass it through to yt-dlp
     if cookies_path is not None and cookies_path.exists():
         ydl_opts["cookiefile"] = str(cookies_path)
 
@@ -57,9 +60,12 @@ def _ffmpeg_normalise_to_16k_mono(
     cmd = [
         "ffmpeg",
         "-y",
-        "-i", str(src_audio),
-        "-ac", str(channels),
-        "-ar", str(sample_rate),
+        "-i",
+        str(src_audio),
+        "-ac",
+        str(channels),
+        "-ar",
+        str(sample_rate),
         "-vn",
         str(dst_audio),
     ]
@@ -88,6 +94,37 @@ def _audio_metadata(wav_path: Path) -> Dict[str, Any]:
     }
 
 
+def _resolve_cookies_path(explicit: Optional[str]) -> Optional[Path]:
+    """
+    Resolve a cookies file path with this precedence:
+
+    1. Explicit argument (if provided and exists)
+    2. Environment variable YTDLP_COOKIES_PATH (if set and exists)
+    3. Local ./yt_cookies.txt (if exists)
+
+    Returns a Path or None.
+    """
+    # 1) Explicit argument
+    if explicit:
+        p = Path(explicit)
+        if p.exists():
+            return p
+
+    # 2) Environment variable
+    env_path = os.environ.get("YTDLP_COOKIES_PATH")
+    if env_path:
+        p = Path(env_path)
+        if p.exists():
+            return p
+
+    # 3) Default local file in project root
+    p = Path("yt_cookies.txt")
+    if p.exists():
+        return p
+
+    return None
+
+
 def ingest_youtube(
     youtube_url: str,
     cfg: Optional[FactrConfig] = None,
@@ -110,8 +147,16 @@ def ingest_youtube(
     run_id = uuid.uuid4().hex[:8]
     ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
+    # Resolve cookies path (explicit arg > env var > local yt_cookies.txt)
+    cookies = _resolve_cookies_path(cookies_path)
+
+    # DEBUG: show what we actually resolved
+    if cookies is None:
+        print("[INGEST] No cookies file found (cookies=None)")
+    else:
+        print(f"[INGEST] Using cookies file: {cookies}")
+
     # 1) Download audio with yt-dlp
-    cookies = Path(cookies_path) if cookies_path else None
     raw_audio = _download_audio_with_yt_dlp(
         youtube_url=youtube_url,
         out_dir=processed_dir,
