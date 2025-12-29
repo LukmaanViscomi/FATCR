@@ -54,3 +54,10 @@ data/processed/KB_christian.faiss
 data/processed/KB_all.faiss
 data/processed/KB_islam.faiss
 models/
+
+# Local/private/generated artifacts
+yt_cookies.txt
+data/processed/*.webm
+data/processed/*.wav
+data/processed/*.log
+Claim-Reports/
