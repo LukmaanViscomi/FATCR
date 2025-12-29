@@ -1,0 +1,13 @@
+streamlit
+openai>=1.0.0
+pandas
+numpy
+soundfile
+yt-dlp
+
+# GPU ASR stack
+ctranslate2[cuda]==4.3.1
+faster-whisper==1.0.3
+
+# (PyTorch already comes with the RunPod CUDA image;
+# no need to pin it unless you really want to.)
