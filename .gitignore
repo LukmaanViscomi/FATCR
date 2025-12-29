@@ -57,27 +57,15 @@ temp/
 # Raw data is always generated / large
 data/raw/
 
-# Track data/processed by default — but exclude the big/generated artefacts
-# (keep small JSON/CSV/Parquet snapshots & evaluation outputs in git)
-
-# --- Exclude large FAISS indices ---
+# Keep all processed outputs, but exclude ONLY the two largest indices
 data/processed/KB_all.faiss
 data/processed/KB_islam.faiss
-data/processed/KB_christian.faiss
 
-# Optional: if this one is also big for you, exclude it too
-# data/processed/KB.faiss
+# Keep KB_*.map.jsonl (do NOT ignore them)
 
-# --- Exclude large / regenerable mapping files (enable if needed) ---
-# If you DO want to keep these, comment these 3 lines out.
-data/processed/KB_all.map.jsonl
-data/processed/KB_islam.map.jsonl
-data/processed/KB_christian.map.jsonl
+# Keep snapshots (do NOT ignore snapshots/)
 
-# Optional: passages file is often huge
-data/processed/KB_passages.jsonl
-
-# Logs / local runtime files
+# Logs / runtime noise (optional – keep if you want logs out of git)
 data/processed/*.log
 
 # Never commit cookies/secrets
@@ -91,4 +79,3 @@ models/
 *.env
 .env
 .env.*
-
