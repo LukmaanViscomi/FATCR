@@ -51,3 +51,6 @@ Thumbs.db
 !data/processed/**/*.faiss
 !data/processed/**/*.csv
 data/processed/KB_christian.faiss
+data/processed/KB_all.faiss
+data/processed/KB_islam.faiss
+models/
