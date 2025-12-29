@@ -79,3 +79,9 @@ models/
 *.env
 .env
 .env.*
+
+# Snapshots: keep only the 3 pointer files
+snapshots/*
+!snapshots/ASR_LAST.json
+!snapshots/CLAIMS_LAST.json
+!snapshots/VERIFY_LAST.json
