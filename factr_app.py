@@ -5,9 +5,11 @@ import json
 from typing import Any, Dict, Optional, List, Tuple
 from datetime import datetime  # <- for logging timestamps
 
+
 import html
 import io
 import re
+import os
 
 import pandas as pd
 import streamlit as st
@@ -76,7 +78,7 @@ def generate_glossary_for_claim(claim_text: str) -> dict:
     try:
         # Use the stable Chat Completions JSON mode
         resp = _glossary_client.chat.completions.create(
-            model="gpt-4.1-mini",  # or gpt-4o-mini if you prefer
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": user_msg},
@@ -301,7 +303,6 @@ def evidence_heading_for_trad(trad_label: str, verdict: Optional[str]) -> str:
     return f"{trad_label} evidence {action}"
 
 
-
 # =====================================================================
 # Timestamp helpers
 # =====================================================================
@@ -352,126 +353,122 @@ def _coerce_time_seconds(v: Any) -> Optional[float]:
         return fv / 1000.0
     return fv
 
-def load_claim_time_cache(processed_dir: Path) -> Dict[str, Tuple[Optional[float], Optional[float]]]:
+def load_claim_time_cache(
+    processed_dir: Path,
+) -> Dict[str, Tuple[Optional[float], Optional[float], str]]:
     """
-    Build a claim_id -> (start_sec, end_sec) cache.
+    Build a simple cache: claim_id -> (start_sec, end_sec, label).
 
-    FACTR claim artefacts can store time in two ways:
-      1) direct numeric fields (t_start/t_end, start/end, etc.)
-      2) an utterance index span (utterance_range=[i0,i1]) which must be resolved
-         via UTTERANCES.parquet (utterance i -> start/end seconds).
+    This version only depends on ``CLAIMS.jsonl`` living inside
+    ``processed_dir`` and is deliberately conservative so it works in
+    lightweight environments (e.g. RunPod) where we might not have
+    all the original preprocessing tooling available.
 
-    The app uses this cache to show timestamps in the UI and include them in CSV exports.
-    Best-effort: if dependencies for reading parquet are missing, we fall back to whatever
-    time fields exist in the claim artefacts.
+    If no usable timestamps are found the cache will be empty and the
+    UI will simply omit time labels.
     """
-    candidates = [
-        processed_dir / "CLAIMS_raw.jsonl",
-        processed_dir / "CLAIMS.jsonl",
-        processed_dir / "CLAIMS_extracted.jsonl",
-        processed_dir / "CLAIMS_raw.json",
-        processed_dir / "CLAIMS.json",
-    ]
+    cache: Dict[str, Tuple[Optional[float], Optional[float], str]] = {}
 
-    # Optional utterance timeline (index -> start/end sec)
-    utterances_fp = processed_dir / "UTTERANCES.parquet"
-    utter_df = None
-    start_col = end_col = None
-    if utterances_fp.exists():
-        try:
-            import pandas as _pd  # noqa: F401
-            # pandas parquet requires pyarrow or fastparquet in most environments
-            utter_df = _pd.read_parquet(utterances_fp)
-            cols = [c.lower() for c in utter_df.columns]
-            # common column name variants
-            def _pick(col_candidates):
-                for cand in col_candidates:
-                    if cand in cols:
-                        return utter_df.columns[cols.index(cand)]
-                return None
-            start_col = _pick(["start", "start_time", "start_sec", "t_start", "start_s"])
-            end_col   = _pick(["end", "end_time", "end_sec", "t_end", "end_s"])
-            # if we can't detect, treat as unavailable
-            if start_col is None or end_col is None:
-                utter_df = None
-        except Exception:
-            utter_df = None
+    claims_path = Path(processed_dir) / "CLAIMS.jsonl"
+    if not claims_path.exists():
+        return cache
 
-    cache: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+    with claims_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
 
-    def _store(cid: Any, t0: Optional[float], t1: Optional[float], claim_text: Any = None) -> None:
-        """Store by claim_id and (optionally) by normalised claim text."""
-        if cid is not None:
-            cache[str(cid)] = (t0, t1)
-        # secondary key: normalised claim text (helps when claim_id formats differ across stages)
-        key_txt = _norm_claim_text(claim_text)
-        if key_txt:
-            cache[f"txt:{key_txt}"] = (t0, t1)
+            cid = row.get("claim_id")
+            if not cid:
+                continue
 
-    for fp in candidates:
-        if not fp.exists():
-            continue
-        try:
-            if fp.suffix.lower() == ".jsonl":
-                lines = fp.read_text(encoding="utf-8").splitlines()
-                items = []
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        items.append(json.loads(line))
-                    except Exception:
-                        continue
-            else:
-                obj = json.loads(fp.read_text(encoding="utf-8"))
-                items = obj if isinstance(obj, list) else (obj.get("claims") or [])
+            # Prefer approx_* (what your CLAIMS.jsonl uses), but fall back to a few other names
+            start = row.get("approx_start") or row.get("start_sec") or row.get("start")
+            end = row.get("approx_end") or row.get("end_sec") or row.get("end")
 
-            for obj in items:
-                cid = obj.get("claim_id") or obj.get("id") or obj.get("claim_idx")
-                # 1) direct timestamps
-                t0 = _coerce_time_seconds(
-                    obj.get("t_start") or obj.get("start") or obj.get("start_time") or obj.get("start_sec") or
-                    (obj.get("provenance") or {}).get("start") or (obj.get("provenance") or {}).get("start_sec")
-                )
-                t1 = _coerce_time_seconds(
-                    obj.get("t_end") or obj.get("end") or obj.get("end_time") or obj.get("end_sec") or
-                    (obj.get("provenance") or {}).get("end") or (obj.get("provenance") or {}).get("end_sec")
-                )
+            try:
+                start_f = float(start)
+                end_f = float(end)
+            except (TypeError, ValueError):
+                # skip rows without usable times
+                continue
 
-                # 2) resolve utterance_range using UTTERANCES.parquet (if available)
-                if (t0 is None or t1 is None) and utter_df is not None:
-                    ur = obj.get("utterance_range") or (obj.get("provenance") or {}).get("utterance_range")
-                    if isinstance(ur, (list, tuple)) and len(ur) == 2:
-                        try:
-                            i0 = int(ur[0])
-                            i1 = int(ur[1])
-                            # treat i1 as inclusive (safer for [0,24] style ranges)
-                            lo = max(0, min(i0, i1))
-                            hi = max(0, max(i0, i1))
-                            hi = min(hi, len(utter_df) - 1)
-                            span = utter_df.iloc[lo:hi+1]
-                            t0 = _coerce_time_seconds(span.iloc[0][start_col])
-                            t1 = _coerce_time_seconds(span.iloc[-1][end_col])
-                        except Exception:
-                            pass
-
-                _store(cid, t0, t1, claim_text=obj.get('claim_text') or obj.get('text') or obj.get('claim'))
-
-        except Exception:
-            continue
-
-        # Prefer the first artefact found that yields any timestamps.
-        if cache:
-            break
+            label = f"{_fmt_hms(start_f)}–{_fmt_hms(end_f)}"
+            cache[cid] = (start_f, end_f, label)
 
     return cache
 
-def extract_claim_times(rec: Dict[str, Any], time_cache: Optional[Dict[Any, Tuple[Optional[float], Optional[float]]]] = None) -> Tuple[Optional[float], Optional[float]]:
-    """Best-effort extraction of start/end time fields from a verification record."""
-    # Common field names across pipelines/notebooks
-    start_keys = ["t_start", "claim_start_sec", "claim_start", "start_sec", "start_seconds", "start", "start_time", "utterance_start"]
-    end_keys = ["t_end", "claim_end_sec", "claim_end", "end_sec", "end_seconds", "end", "end_time", "utterance_end"]
+
+def extract_claim_times(
+    rec: Dict[str, Any],
+    time_cache: Optional[Dict[str, Tuple]] = None,
+) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Extract (start_sec, end_sec) for a claim.
+
+    Strategy:
+    1) Prefer any numeric fields directly on the verification record.
+    2) If not present, look up the claim_id in the optional time_cache.
+
+    The time_cache may store (start, end) or (start, end, label);
+    we only care about the first two elements here.
+    """
+
+    def _first_numeric(keys) -> Optional[float]:
+        for k in keys:
+            if k not in rec:
+                continue
+            v = rec.get(k)
+            if v is None or v == "":
+                continue
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    # 1) Try to read from the verification record itself
+    start = _first_numeric(
+        [
+            "claim_start_sec",
+            "t_start",
+            "start_sec",
+            "start_seconds",
+            "start",
+            "approx_start",
+            "utterance_start",
+        ]
+    )
+    end = _first_numeric(
+        [
+            "claim_end_sec",
+            "t_end",
+            "end_sec",
+            "end_seconds",
+            "end",
+            "approx_end",
+            "utterance_end",
+        ]
+    )
+
+    if start is not None or end is not None:
+        return start, end
+
+    # 2) Fallback: look up in cache built from CLAIMS.jsonl
+    claim_id = rec.get("claim_id") or rec.get("claim_uuid") or rec.get("id")
+    if time_cache and claim_id and claim_id in time_cache:
+        span = time_cache[claim_id]
+        if isinstance(span, (list, tuple)):
+            if len(span) >= 2:
+                # supports (start, end) *or* (start, end, label)
+                return span[0], span[1]
+
+    return None, None
 
     def _from_dict(d: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
         t0 = next((_coerce_time_seconds(d.get(k)) for k in start_keys if d.get(k) is not None), None)
@@ -497,6 +494,8 @@ def extract_claim_times(rec: Dict[str, Any], time_cache: Optional[Dict[Any, Tupl
             key = str(cid)
             if key in time_cache:
                 t0, t1 = time_cache[key]
+            elif f"id:{key}" in time_cache:
+                t0, t1 = time_cache[f"id:{key}"]
 
         # 2) fallback key: normalised claim text (helps when IDs are regenerated)
         if (t0 is None and t1 is None):
@@ -510,15 +509,84 @@ def extract_claim_times(rec: Dict[str, Any], time_cache: Optional[Dict[Any, Tupl
 
     return t0, t1
 
-def claim_time_label(rec: Dict[str, Any], time_cache: Optional[Dict[Any, Tuple[Optional[float], Optional[float]]]] = None) -> str:
-    t0, t1 = extract_claim_times(rec, time_cache=time_cache)
-    a = _fmt_hms(t0)
-    b = _fmt_hms(t1)
-    if a and b:
-        return f"{a}–{b}"
-    if a:
-        return a
+def claim_time_label(
+    rec: Dict[str, Any],
+    time_cache: Optional[Dict[str, Tuple[Optional[float], Optional[float], str]]] = None,
+) -> str:
+    """
+    Return a human-readable time label for a claim.
+
+    Strategy:
+    1) Try to read start/end directly from the verification record.
+    2) If that fails, look up the claim_id in the time_cache built from CLAIMS.jsonl.
+    """
+
+    def _first_numeric(keys) -> Optional[float]:
+        for k in keys:
+            if k not in rec:
+                continue
+            v = rec.get(k)
+            if v is None or v == "":
+                continue
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    # 1) Prefer timestamps that live directly on the verification record
+    start = _first_numeric(
+        [
+            "claim_start_sec",
+            "t_start",
+            "start_sec",
+            "start_seconds",
+            "start",
+            "approx_start",
+            "utterance_start",
+        ]
+    )
+    end = _first_numeric(
+        [
+            "claim_end_sec",
+            "t_end",
+            "end_sec",
+            "end_seconds",
+            "end",
+            "approx_end",
+            "utterance_end",
+        ]
+    )
+
+    if start is not None or end is not None:
+        a = _fmt_hms(start)
+        b = _fmt_hms(end)
+        if a and b:
+            return f"{a}–{b}"
+        if a:
+            return a
+        if b:
+            return b
+
+    # 2) Fallback: look up by claim_id in the optional cache
+    claim_id = rec.get("claim_id") or rec.get("claim_uuid") or rec.get("id")
+    if time_cache and claim_id and claim_id in time_cache:
+        span = time_cache[claim_id]
+        if isinstance(span, (list, tuple)) and len(span) == 3:
+            t0, t1, label = span
+            if label:
+                return label
+            a = _fmt_hms(t0)
+            b = _fmt_hms(t1)
+            if a and b:
+                return f"{a}–{b}"
+            if a:
+                return a
+            if b:
+                return b
+
     return ""
+
 
 
 def pretty_source(src: str) -> str:
@@ -598,12 +666,50 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
     # --- Claim header -------------------------------------------------------
     st.markdown(f"### Claim {idx + 1}")
 
-    # Timestamp (if available)
-    ts = rec.get("claim_time") or claim_time_label(rec)
-    if ts:
-        st.caption(f"🕒 {ts}")
+    # ------------------------------------------------------------------
+    # Timestamp (if available) + optional video jump link
+    # ------------------------------------------------------------------
+    # Get or lazily build the claim time cache (CLAIMS.jsonl)
+    time_cache = st.session_state.get("time_cache")
+    if time_cache is None:
+        try:
+            cfg0 = st.session_state.get("cfg") or FactrConfig()
+            time_cache = load_claim_time_cache(cfg0.processed_dir)
+            st.session_state["time_cache"] = time_cache
+            st.session_state["time_cache_dir"] = str(cfg0.processed_dir)
+        except Exception:
+            time_cache = None
 
+    # Human-readable label like "0:15–0:22"
+    ts_label = rec.get("claim_time") or claim_time_label(rec, time_cache=time_cache)
+    if ts_label:
+        st.caption(f"🕒 {ts_label}")
+
+    # Optional "jump to video" link if we know the debate URL AND a numeric start
+    base_url = st.session_state.get("oneclick_url") or ""
+    start_sec = rec.get("claim_start_sec")
+    try:
+        start_sec_f = float(start_sec) if start_sec is not None else None
+    except (TypeError, ValueError):
+        start_sec_f = None
+
+    if base_url and start_sec_f is not None:
+        # strip any existing t=… parameter and add our own
+        url_no_t = re.sub(r"[?&]t=\d+s?", "", base_url)
+        sep = "&" if "?" in url_no_t else "?"
+        jump_url = f"{url_no_t}{sep}t={int(start_sec_f)}s"
+        st.markdown(
+            f"[▶️ Jump to this moment in the video]({jump_url})",
+            unsafe_allow_html=False,
+        )
+
+    # Claim text
     st.markdown(f"**{claim_text}**")
+
+    # Optional per-claim debug payload
+    if st.session_state.get("debug_mode"):
+        with st.expander("Raw claim record (debug)", expanded=False):
+            st.json(rec)
 
     # --- Verdict row: Islamic / Christian / Both / Confidence ---------------
     cols = st.columns([1, 1, 1, 1])
@@ -677,9 +783,9 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
     if explanation:
         st.markdown("**Explanation**")
         st.markdown(explanation)
-    
+
     # --- User feedback on this verdict --------------------------------------
-    feedback_key = f"feedback_claim_{rec.get('claim_id', idx)}"
+    feedback_key = f"feedback_claim_{rec.get('claim_id','NA')}_{idx}"
     with st.expander("Feedback on this verdict (optional)"):
         st.markdown(
             "Help improve FACTR by telling us whether this verdict seems reasonable. "
@@ -719,8 +825,10 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                     comment=None,
                     user_tag=user_tag,
                 )
-                st.success("Thanks – feedback recorded. "
-                           "You can also add a short comment below if you wish.")
+                st.success(
+                    "Thanks – feedback recorded. "
+                    "You can also add a short comment below if you wish."
+                )
 
         # Always-available comment box
         comment = st.text_area(
@@ -743,8 +851,9 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                 )
                 st.success("Thanks – your comment was recorded.")
             else:
-                st.info("Please type a comment before submitting, or just use the buttons above.")
-
+                st.info(
+                    "Please type a comment before submitting, or just use the buttons above."
+                )
 
     # --- Glossary for key terms in this claim -------------------------------
     with st.expander("Explain key terms in this claim (glossary)"):
@@ -764,9 +873,13 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                 text = ev.get("text") or ""
                 label = f"[Islamic {ev_id}]" if ev_id is not None else "[Islamic]"
 
-                src = pretty_source(ev.get("source") or ev.get("dataset") or ev.get("collection") or "")
+                src = pretty_source(
+                    ev.get("source") or ev.get("dataset") or ev.get("collection") or ""
+                )
                 page = ev.get("page") or ev.get("page_no") or ev.get("loc") or ""
-                src_bits = " | ".join([b for b in [src, (f"p.{page}" if page else "")] if b])
+                src_bits = " | ".join(
+                    [b for b in [src, (f"p.{page}" if page else "")] if b]
+                )
                 src_str = f" _({src_bits})_" if src_bits else ""
                 st.markdown(f"- **{label} {ref}**{src_str}")
                 render_plain_text_block(text)
@@ -784,9 +897,26 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                                 c_ref = c.ref or ""
                                 c_text = c.text or ""
 
-                                c_src = pretty_source(getattr(c, "source", "") or getattr(c, "dataset", "") or "")
-                                c_page = getattr(c, "page", "") or getattr(c, "page_no", "") or ""
-                                c_bits = " | ".join([b for b in [c_src, (f"p.{c_page}" if c_page else "")] if b])
+                                c_src = pretty_source(
+                                    getattr(c, "source", "")
+                                    or getattr(c, "dataset", "")
+                                    or ""
+                                )
+                                c_page = (
+                                    getattr(c, "page", "")
+                                    or getattr(c, "page_no", "")
+                                    or ""
+                                )
+                                c_bits = " | ".join(
+                                    [
+                                        b
+                                        for b in [
+                                            c_src,
+                                            (f"p.{c_page}" if c_page else ""),
+                                        ]
+                                        if b
+                                    ]
+                                )
                                 c_hdr = f"{c_ref}" + (f" ({c_bits})" if c_bits else "")
                                 st.markdown(f"**{c_hdr}**")
                                 st.markdown(
@@ -809,9 +939,13 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                 text = ev.get("text") or ""
                 label = f"[Christian {ev_id}]" if ev_id is not None else "[Christian]"
 
-                src = pretty_source(ev.get("source") or ev.get("dataset") or ev.get("collection") or "")
+                src = pretty_source(
+                    ev.get("source") or ev.get("dataset") or ev.get("collection") or ""
+                )
                 page = ev.get("page") or ev.get("page_no") or ev.get("loc") or ""
-                src_bits = " | ".join([b for b in [src, (f"p.{page}" if page else "")] if b])
+                src_bits = " | ".join(
+                    [b for b in [src, (f"p.{page}" if page else "")] if b]
+                )
                 src_str = f" _({src_bits})_" if src_bits else ""
                 st.markdown(f"- **{label} {ref}**{src_str}")
                 render_plain_text_block(text)
@@ -831,9 +965,26 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
                                 c_ref = c.ref or ""
                                 c_text = c.text or ""
 
-                                c_src = pretty_source(getattr(c, "source", "") or getattr(c, "dataset", "") or "")
-                                c_page = getattr(c, "page", "") or getattr(c, "page_no", "") or ""
-                                c_bits = " | ".join([b for b in [c_src, (f"p.{c_page}" if c_page else "")] if b])
+                                c_src = pretty_source(
+                                    getattr(c, "source", "")
+                                    or getattr(c, "dataset", "")
+                                    or ""
+                                )
+                                c_page = (
+                                    getattr(c, "page", "")
+                                    or getattr(c, "page_no", "")
+                                    or ""
+                                )
+                                c_bits = " | ".join(
+                                    [
+                                        b
+                                        for b in [
+                                            c_src,
+                                            (f"p.{c_page}" if c_page else ""),
+                                        ]
+                                        if b
+                                    ]
+                                )
                                 c_hdr = f"{c_ref}" + (f" ({c_bits})" if c_bits else "")
                                 st.markdown(f"**{c_hdr}**")
                                 st.markdown(
@@ -855,7 +1006,7 @@ def render_claim_card(idx: int, rec: Dict[str, Any]) -> None:
 
 def render_oneclick_results(rows: List[Dict[str, Any]], cfg: Optional["FactrConfig"] = None) -> None:
     """
-    Render the \'Debate analysis – claims and verdicts\' section
+    Render the 'Debate analysis – claims and verdicts' section
     (table download + per-claim cards) from a list of verification rows.
     """
     if not rows:
@@ -877,7 +1028,7 @@ def render_oneclick_results(rows: List[Dict[str, Any]], cfg: Optional["FactrConf
         t0, t1 = extract_claim_times(rec, time_cache=time_cache)
         rec2["claim_start_sec"] = t0
         rec2["claim_end_sec"] = t1
-        rec2["claim_time"] = claim_time_label(rec, time_cache=time_cache)
+        rec2["claim_time"] = claim_time_label(rec2, time_cache=time_cache)
         rows_out.append(rec2)
 
     df = pd.DataFrame(rows_out)
@@ -930,6 +1081,18 @@ def main() -> None:
     """, unsafe_allow_html=True)
 
     st.title("FACTR – Debate Analyzer")
+        # Debug toggle
+    st.checkbox("Debug mode", key="debug_mode")
+
+    # ####################debug-sidebar#################################################
+    # # Somewhere near the top of `main()`, probably in the sidebar:
+    # st.sidebar.checkbox("Debug mode", key="debug_mode")
+
+    # # Inside `render_oneclick_results`, where you loop over each `rec`:
+    # if st.session_state.get("debug_mode"):
+    #     with st.expander("Raw claim record (debug)", expanded=False):
+    #         st.json(rec)
+    # #########################################################################
 
     # -----------------------------------------------------------------
     # Per-user session ID (prevents users seeing each other's last run)
@@ -964,6 +1127,10 @@ def main() -> None:
 
     # IMPORTANT: use the session config (do NOT recreate a new FactrConfig)
     cfg = st.session_state.get("cfg", FactrConfig())
+    # Build / refresh claim timestamp cache (used for UI timestamps)
+    if (st.session_state.get("time_cache") is None) or (st.session_state.get("time_cache_dir") != str(cfg.processed_dir)):
+        st.session_state["time_cache"] = load_claim_time_cache(cfg.processed_dir)
+        st.session_state["time_cache_dir"] = str(cfg.processed_dir)
     log_file = cfg.processed_dir / "ONECLICK_RUN.log"
 
     # If the browser refreshed (common on iOS), try to recover the last completed results

@@ -6,3 +6,7 @@ soundfile
 yt-dlp
 faster-whisper
 sentence-transformers
+matplotlib
+pyarrow
+fastparquet
+tiktoken

@@ -1,4 +1,0 @@
-query,precision@10,recall@10,mAP@10
-main thesis,0.2,1.0,0.45
-numerical claims,0.0,,
-theological assertion,0.9,1.0,0.989
