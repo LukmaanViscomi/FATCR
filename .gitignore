@@ -49,6 +49,7 @@ temp/
 *.pid
 
 
+
 ###########################################################
 # FACTR-specific data and artefacts
 ###########################################################
@@ -56,46 +57,38 @@ temp/
 # Raw data is always generated / large
 data/raw/
 
-# By default ignore EVERYTHING in data/processed
-data/processed/*
+# Track data/processed by default — but exclude the big/generated artefacts
+# (keep small JSON/CSV/Parquet snapshots & evaluation outputs in git)
 
-# ---- Allow-list: core artifacts we DO want in git ----
+# --- Exclude large FAISS indices ---
+data/processed/KB_all.faiss
+data/processed/KB_islam.faiss
+data/processed/KB_christian.faiss
 
-# KB snapshot for runtime
-!data/processed/KB.faiss
-!data/processed/KB.index.json
-#!data/processed/KB_passages.jsonl
-!data/processed/KB_embeddings.meta.json
+# Optional: if this one is also big for you, exclude it too
+# data/processed/KB.faiss
 
-# Full claims / verification dataset
-!data/processed/CLAIMS.json
-!data/processed/VERIFICATION.json
-!data/processed/UTTERANCES.parquet
+# --- Exclude large / regenerable mapping files (enable if needed) ---
+# If you DO want to keep these, comment these 3 lines out.
+data/processed/KB_all.map.jsonl
+data/processed/KB_islam.map.jsonl
+data/processed/KB_christian.map.jsonl
 
-# Claims index / metadata
-!data/processed/CLAIMS.faiss
-!data/processed/CLAIMS.index.json
-!data/processed/CLAIMS.rows.min.json
-!data/processed/CLAIMS_embeddings.meta.json
+# Optional: passages file is often huge
+data/processed/KB_passages.jsonl
 
-# Evaluation summaries for MSc analysis
-!data/processed/eval_labels.csv
-!data/processed/eval_labels_with_text.csv
-!data/processed/eval_main_thesis_top10.csv
-!data/processed/eval_numerical_claims_top10.csv
-!data/processed/eval_summary_k10.csv
-!data/processed/eval_theological_assertion_top10.csv
-!data/processed/search_numerical_claims_top20.csv
-!data/processed/verification_summary.csv
+# Logs / local runtime files
+data/processed/*.log
 
-# Any other scratch / output dirs you might add
-scratch/
-outputs/
-checkpoints/
-snapshots/
+# Never commit cookies/secrets
+**/yt_cookies.txt
+
+# Never commit model caches
+models/
 
 # Local-only config / secrets (never commit)
 .streamlit/secrets.toml
 *.env
 .env
 .env.*
+
