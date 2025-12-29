@@ -1,0 +1,10 @@
+{
+  "run_id": "5ccebace",
+  "created_utc": "2025-12-11T11:56:11.922356Z",
+  "youtube_url": "https://www.youtube.com/watch?v=W6qxgznMcnE&t=95s",
+  "raw_audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\763d4a4a65.webm",
+  "audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\5ccebace_16k_mono.wav",
+  "sample_rate": 16000,
+  "channels": 1,
+  "duration_sec": 1155.6339375
+}
