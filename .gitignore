@@ -50,3 +50,4 @@ Thumbs.db
 !data/processed/**/*.parquet
 !data/processed/**/*.faiss
 !data/processed/**/*.csv
+data/processed/KB_christian.faiss
