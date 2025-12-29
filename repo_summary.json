@@ -1,0 +1,1110 @@
+{
+  "stats": {
+    "total_files": 203,
+    "total_size_bytes": 4133452917
+  },
+  "file_types": {
+    "no_extension": 3,
+    ".ps1": 1,
+    ".py": 13,
+    ".jsonl": 8,
+    ".txt": 6,
+    ".md": 2,
+    ".json": 130,
+    ".toml": 1,
+    ".csv": 14,
+    ".xlsx": 1,
+    ".faiss": 5,
+    ".npy": 2,
+    ".parquet": 1,
+    ".bin": 1,
+    ".ipynb": 13,
+    ".png": 2
+  },
+  "findings": {
+    "docker": [
+      "Dockerfile"
+    ],
+    "entry_points": [
+      "factr_app.py",
+      ".streamlit\\config.toml",
+      "factr\\app.py",
+      "models\\whisper\\models--Systran--faster-whisper-large-v2\\refs\\main"
+    ],
+    "docs": [
+      "README.md",
+      "factr\\README.md"
+    ],
+    "kb": [
+      "data\\kb_inspect_exports\\kb_by_genre.csv",
+      "data\\kb_inspect_exports\\kb_by_language.csv",
+      "data\\kb_inspect_exports\\kb_by_tradition.csv",
+      "data\\kb_inspect_exports\\kb_top_collections.csv",
+      "data\\kb_inspect_exports_full\\kb_buckets_full.csv",
+      "data\\kb_inspect_exports_full\\kb_by_genre_full.csv",
+      "data\\kb_inspect_exports_full\\kb_by_language_full.csv",
+      "data\\kb_inspect_exports_full\\kb_by_tradition_full.csv",
+      "data\\kb_inspect_exports_full\\kb_top_collections_full.csv",
+      "data\\kb_inspect_exports_full\\kb_tradition_by_collection_full.csv",
+      "data\\kb_inspect_exports_full\\kb_tradition_by_genre_full.csv",
+      "data\\processed\\CLAIMS.faiss",
+      "data\\processed\\CLAIMS_embeddings.meta.json",
+      "data\\processed\\CLAIMS_embeddings.npy",
+      "data\\processed\\KB.faiss",
+      "data\\processed\\KB.index.json",
+      "data\\processed\\KB_all.faiss",
+      "data\\processed\\KB_all.map.jsonl",
+      "data\\processed\\KB_christian.faiss",
+      "data\\processed\\KB_christian.map.jsonl",
+      "data\\processed\\KB_embeddings.meta.json",
+      "data\\processed\\KB_embeddings.npy",
+      "data\\processed\\KB_islam.faiss",
+      "data\\processed\\KB_islam.map.jsonl",
+      "data\\processed\\KB_passages.jsonl",
+      "data\\processed\\LAST_FAISS.json",
+      "data\\processed\\LAST_KB.json",
+      "factr\\kb.py",
+      "notebooks\\FACTR-KB-Contruction\\Create_Christian_Creeds_Repo.ipynb",
+      "notebooks\\FACTR-KB-Contruction\\FACTR_02_KB_Ingest_lang.ipynb",
+      "notebooks\\FACTR-KB-Contruction\\Primary Source Import Helper v3.4.1 (adapter-based).ipynb",
+      "notebooks\\FACTR-PIpeline\\FACTR_04_Claims+Embeddings_v2025-09-07_2.1.ipynb",
+      "notebooks\\FACTR-Projet Anaysis\\FACTR_KB_Inspector.ipynb",
+      "notebooks\\FACTR-Projet Anaysis\\FACTR_KB_Inspector_Dissertation.ipynb"
+    ],
+    "notebooks": [
+      "notebooks\\FACTR-KB-Contruction\\Create_Christian_Creeds_Repo.ipynb",
+      "notebooks\\FACTR-KB-Contruction\\FACTR_02_KB_Ingest_lang.ipynb",
+      "notebooks\\FACTR-KB-Contruction\\Primary Source Import Helper v3.4.1 (adapter-based).ipynb",
+      "notebooks\\FACTR-PIpeline\\FACTR_01_Setup_v2025-09-09_V2.0.ipynb",
+      "notebooks\\FACTR-PIpeline\\FACTR_02_Ingest_v2025-09-07_2.0.ipynb",
+      "notebooks\\FACTR-PIpeline\\FACTR_03_ASR+Diarize_v2025-09-07_2.0.ipynb",
+      "notebooks\\FACTR-PIpeline\\FACTR_04_Claims+Embeddings_v2025-09-07_2.1.ipynb",
+      "notebooks\\FACTR-PIpeline\\FACTR_05_Search+Eval_v2025-09-16_v2.0.ipynb",
+      "notebooks\\FACTR-PIpeline\\FACTR_06_Verify.ipynb",
+      "notebooks\\FACTR-Projet Anaysis\\FACTR_Feedback_Inspector.ipynb",
+      "notebooks\\FACTR-Projet Anaysis\\FACTR_KB_Inspector.ipynb",
+      "notebooks\\FACTR-Projet Anaysis\\FACTR_KB_Inspector_Dissertation.ipynb",
+      "notebooks\\FACTR-Projet Anaysis\\FACTR_Results_Inspector_Reusable.ipynb"
+    ],
+    "evaluation": [
+      "notebooks\\FACTR-PIpeline\\FACTR_05_Search+Eval_v2025-09-16_v2.0.ipynb"
+    ]
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "extension": "no_extension",
+      "size_bytes": 2034
+    },
+    {
+      "path": "build_and_push.ps1",
+      "extension": ".ps1",
+      "size_bytes": 233
+    },
+    {
+      "path": "Dockerfile",
+      "extension": "no_extension",
+      "size_bytes": 1232
+    },
+    {
+      "path": "factrConfig.py",
+      "extension": ".py",
+      "size_bytes": 357
+    },
+    {
+      "path": "factr_app.py",
+      "extension": ".py",
+      "size_bytes": 66681
+    },
+    {
+      "path": "factr_verdict_feedback.jsonl",
+      "extension": ".jsonl",
+      "size_bytes": 3964
+    },
+    {
+      "path": "glossary.py",
+      "extension": ".py",
+      "size_bytes": 4266
+    },
+    {
+      "path": "interrogate_repo.py",
+      "extension": ".py",
+      "size_bytes": 3514
+    },
+    {
+      "path": "packages.txt",
+      "extension": ".txt",
+      "size_bytes": 6
+    },
+    {
+      "path": "README.md",
+      "extension": ".md",
+      "size_bytes": 39
+    },
+    {
+      "path": "requirements.txt",
+      "extension": ".txt",
+      "size_bytes": 141
+    },
+    {
+      "path": "requirements_gpu.txt",
+      "extension": ".txt",
+      "size_bytes": 233
+    },
+    {
+      "path": "ui_faq.py",
+      "extension": ".py",
+      "size_bytes": 18792
+    },
+    {
+      "path": "yt_cookies.txt",
+      "extension": ".txt",
+      "size_bytes": 1625
+    },
+    {
+      "path": ".devcontainer\\devcontainer.json",
+      "extension": ".json",
+      "size_bytes": 1066
+    },
+    {
+      "path": ".streamlit\\config.toml",
+      "extension": ".toml",
+      "size_bytes": 199
+    },
+    {
+      "path": "Claim-Reports\\factr_verification_results (11).csv",
+      "extension": ".csv",
+      "size_bytes": 37276
+    },
+    {
+      "path": "Claim-Reports\\factr_verification_results 11-12-2025.xlsx",
+      "extension": ".xlsx",
+      "size_bytes": 167855
+    },
+    {
+      "path": "data\\kb_inspect_exports\\kb_by_genre.csv",
+      "extension": ".csv",
+      "size_bytes": 29
+    },
+    {
+      "path": "data\\kb_inspect_exports\\kb_by_language.csv",
+      "extension": ".csv",
+      "size_bytes": 22
+    },
+    {
+      "path": "data\\kb_inspect_exports\\kb_by_tradition.csv",
+      "extension": ".csv",
+      "size_bytes": 25
+    },
+    {
+      "path": "data\\kb_inspect_exports\\kb_top_collections.csv",
+      "extension": ".csv",
+      "size_bytes": 25
+    },
+    {
+      "path": "data\\kb_inspect_exports_full\\kb_buckets_full.csv",
+      "extension": ".csv",
+      "size_bytes": 72
+    },
+    {
+      "path": "data\\kb_inspect_exports_full\\kb_by_genre_full.csv",
+      "extension": ".csv",
+      "size_bytes": 86
+    },
+    {
+      "path": "data\\kb_inspect_exports_full\\kb_by_language_full.csv",
+      "extension": ".csv",
+      "size_bytes": 34
+    },
+    {
+      "path": "data\\kb_inspect_exports_full\\kb_by_tradition_full.csv",
+      "extension": ".csv",
+      "size_bytes": 47
+    },
+    {
+      "path": "data\\kb_inspect_exports_full\\kb_top_collections_full.csv",
+      "extension": ".csv",
+      "size_bytes": 170
+    },
+    {
+      "path": "data\\kb_inspect_exports_full\\kb_tradition_by_collection_full.csv",
+      "extension": ".csv",
+      "size_bytes": 248
+    },
+    {
+      "path": "data\\kb_inspect_exports_full\\kb_tradition_by_genre_full.csv",
+      "extension": ".csv",
+      "size_bytes": 170
+    },
+    {
+      "path": "data\\processed\\CLAIMS.faiss",
+      "extension": ".faiss",
+      "size_bytes": 669741
+    },
+    {
+      "path": "data\\processed\\CLAIMS.index.json",
+      "extension": ".json",
+      "size_bytes": 1418
+    },
+    {
+      "path": "data\\processed\\CLAIMS.jsonl",
+      "extension": ".jsonl",
+      "size_bytes": 2368
+    },
+    {
+      "path": "data\\processed\\CLAIMS.rows.min.json",
+      "extension": ".json",
+      "size_bytes": 20893
+    },
+    {
+      "path": "data\\processed\\CLAIMS_embeddings.meta.json",
+      "extension": ".json",
+      "size_bytes": 275
+    },
+    {
+      "path": "data\\processed\\CLAIMS_embeddings.npy",
+      "extension": ".npy",
+      "size_bytes": 669824
+    },
+    {
+      "path": "data\\processed\\CLAIMS_raw.jsonl",
+      "extension": ".jsonl",
+      "size_bytes": 19366
+    },
+    {
+      "path": "data\\processed\\KB.faiss",
+      "extension": ".faiss",
+      "size_bytes": 78004269
+    },
+    {
+      "path": "data\\processed\\KB.index.json",
+      "extension": ".json",
+      "size_bytes": 219007
+    },
+    {
+      "path": "data\\processed\\KB_all.faiss",
+      "extension": ".faiss",
+      "size_bytes": 249925677
+    },
+    {
+      "path": "data\\processed\\KB_all.map.jsonl",
+      "extension": ".jsonl",
+      "size_bytes": 5309988
+    },
+    {
+      "path": "data\\processed\\KB_christian.faiss",
+      "extension": ".faiss",
+      "size_bytes": 96039981
+    },
+    {
+      "path": "data\\processed\\KB_christian.map.jsonl",
+      "extension": ".jsonl",
+      "size_bytes": 2007381
+    },
+    {
+      "path": "data\\processed\\KB_embeddings.meta.json",
+      "extension": ".json",
+      "size_bytes": 136
+    },
+    {
+      "path": "data\\processed\\KB_embeddings.npy",
+      "extension": ".npy",
+      "size_bytes": 249925760
+    },
+    {
+      "path": "data\\processed\\KB_islam.faiss",
+      "extension": ".faiss",
+      "size_bytes": 153885741
+    },
+    {
+      "path": "data\\processed\\KB_islam.map.jsonl",
+      "extension": ".jsonl",
+      "size_bytes": 3228971
+    },
+    {
+      "path": "data\\processed\\KB_passages.jsonl",
+      "extension": ".jsonl",
+      "size_bytes": 201929307
+    },
+    {
+      "path": "data\\processed\\LAST_ASR.json",
+      "extension": ".json",
+      "size_bytes": 121
+    },
+    {
+      "path": "data\\processed\\LAST_CLAIMS.json",
+      "extension": ".json",
+      "size_bytes": 140
+    },
+    {
+      "path": "data\\processed\\LAST_FAISS.json",
+      "extension": ".json",
+      "size_bytes": 250
+    },
+    {
+      "path": "data\\processed\\LAST_INGEST.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "data\\processed\\LAST_KB.json",
+      "extension": ".json",
+      "size_bytes": 589
+    },
+    {
+      "path": "data\\processed\\LAST_SEARCH.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "data\\processed\\LAST_VERIFY.json",
+      "extension": ".json",
+      "size_bytes": 373
+    },
+    {
+      "path": "data\\processed\\UTTERANCES.parquet",
+      "extension": ".parquet",
+      "size_bytes": 6049
+    },
+    {
+      "path": "data\\processed\\VERIFICATION.jsonl",
+      "extension": ".jsonl",
+      "size_bytes": 27308
+    },
+    {
+      "path": "data\\processed\\yt_cookies.txt",
+      "extension": ".txt",
+      "size_bytes": 3102
+    },
+    {
+      "path": "factr\\app.py",
+      "extension": ".py",
+      "size_bytes": 1979
+    },
+    {
+      "path": "factr\\asr.py",
+      "extension": ".py",
+      "size_bytes": 5238
+    },
+    {
+      "path": "factr\\claims.py",
+      "extension": ".py",
+      "size_bytes": 8579
+    },
+    {
+      "path": "factr\\config.py",
+      "extension": ".py",
+      "size_bytes": 1296
+    },
+    {
+      "path": "factr\\ingest.py",
+      "extension": ".py",
+      "size_bytes": 5289
+    },
+    {
+      "path": "factr\\kb.py",
+      "extension": ".py",
+      "size_bytes": 5829
+    },
+    {
+      "path": "factr\\README.md",
+      "extension": ".md",
+      "size_bytes": 32
+    },
+    {
+      "path": "factr\\verify.py",
+      "extension": ".py",
+      "size_bytes": 12020
+    },
+    {
+      "path": "factr\\__init__.py",
+      "extension": ".py",
+      "size_bytes": 0
+    },
+    {
+      "path": "models\\whisper\\models--Systran--faster-whisper-large-v2\\refs\\main",
+      "extension": "no_extension",
+      "size_bytes": 40
+    },
+    {
+      "path": "models\\whisper\\models--Systran--faster-whisper-large-v2\\snapshots\\f0fe81560cb8b68660e564f55dd99207059c092e\\config.json",
+      "extension": ".json",
+      "size_bytes": 2796
+    },
+    {
+      "path": "models\\whisper\\models--Systran--faster-whisper-large-v2\\snapshots\\f0fe81560cb8b68660e564f55dd99207059c092e\\model.bin",
+      "extension": ".bin",
+      "size_bytes": 3086912962
+    },
+    {
+      "path": "models\\whisper\\models--Systran--faster-whisper-large-v2\\snapshots\\f0fe81560cb8b68660e564f55dd99207059c092e\\tokenizer.json",
+      "extension": ".json",
+      "size_bytes": 2203239
+    },
+    {
+      "path": "models\\whisper\\models--Systran--faster-whisper-large-v2\\snapshots\\f0fe81560cb8b68660e564f55dd99207059c092e\\vocabulary.txt",
+      "extension": ".txt",
+      "size_bytes": 459861
+    },
+    {
+      "path": "notebooks\\FACTR-KB-Contruction\\Create_Christian_Creeds_Repo.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 15955
+    },
+    {
+      "path": "notebooks\\FACTR-KB-Contruction\\FACTR_02_KB_Ingest_lang.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 196004
+    },
+    {
+      "path": "notebooks\\FACTR-KB-Contruction\\Primary Source Import Helper v3.4.1 (adapter-based).ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 136681
+    },
+    {
+      "path": "notebooks\\FACTR-PIpeline\\FACTR_01_Setup_v2025-09-09_V2.0.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 17968
+    },
+    {
+      "path": "notebooks\\FACTR-PIpeline\\FACTR_02_Ingest_v2025-09-07_2.0.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 21636
+    },
+    {
+      "path": "notebooks\\FACTR-PIpeline\\FACTR_03_ASR+Diarize_v2025-09-07_2.0.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 18795
+    },
+    {
+      "path": "notebooks\\FACTR-PIpeline\\FACTR_04_Claims+Embeddings_v2025-09-07_2.1.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 50226
+    },
+    {
+      "path": "notebooks\\FACTR-PIpeline\\FACTR_05_Search+Eval_v2025-09-16_v2.0.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 226901
+    },
+    {
+      "path": "notebooks\\FACTR-PIpeline\\FACTR_06_Verify.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 9392
+    },
+    {
+      "path": "notebooks\\FACTR-Projet Anaysis\\FACTR_Feedback_Inspector.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 134090
+    },
+    {
+      "path": "notebooks\\FACTR-Projet Anaysis\\FACTR_KB_Inspector.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 124265
+    },
+    {
+      "path": "notebooks\\FACTR-Projet Anaysis\\FACTR_KB_Inspector_Dissertation.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 295590
+    },
+    {
+      "path": "notebooks\\FACTR-Projet Anaysis\\FACTR_Results_Inspector_Reusable.ipynb",
+      "extension": ".ipynb",
+      "size_bytes": 175854
+    },
+    {
+      "path": "reports\\analysis_outputs\\feedback_raw.csv",
+      "extension": ".csv",
+      "size_bytes": 1988
+    },
+    {
+      "path": "reports\\analysis_outputs\\feedback_reaction_summary.csv",
+      "extension": ".csv",
+      "size_bytes": 78
+    },
+    {
+      "path": "reports\\analysis_outputs\\fig_feedback_reactions.png",
+      "extension": ".png",
+      "size_bytes": 72516
+    },
+    {
+      "path": "reports\\analysis_outputs\\fig_feedback_top_terms.png",
+      "extension": ".png",
+      "size_bytes": 79812
+    },
+    {
+      "path": "snapshots\\ASR_LAST.json",
+      "extension": ".json",
+      "size_bytes": 351
+    },
+    {
+      "path": "snapshots\\CLAIMS_LAST.json",
+      "extension": ".json",
+      "size_bytes": 209
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_006799d9.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_02717687.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_02d8ba90.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_07599802.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_07ef278f.json",
+      "extension": ".json",
+      "size_bytes": 406
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_08705acd.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_0e8db3a3.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_110cb601.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_11bc1114.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_13182648.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_13197d2e.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_142487d8.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_14263c30.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_14b22b35.json",
+      "extension": ".json",
+      "size_bytes": 412
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_155696d5.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_198069db.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_1a14c0b1.json",
+      "extension": ".json",
+      "size_bytes": 412
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_1b286d4d.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_1ceaea8c.json",
+      "extension": ".json",
+      "size_bytes": 416
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_1de4c66f.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_1fbed232.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_23317f6f.json",
+      "extension": ".json",
+      "size_bytes": 415
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_23d1c2f9.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_28b678fc.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_28f871f1.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_2ae7ec47.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_2fa30e08.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_3167bd23.json",
+      "extension": ".json",
+      "size_bytes": 416
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_32e767d0.json",
+      "extension": ".json",
+      "size_bytes": 410
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_337b3458.json",
+      "extension": ".json",
+      "size_bytes": 416
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_37a5b89a.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_3a513dc1.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_3c49035f.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_41772e68.json",
+      "extension": ".json",
+      "size_bytes": 412
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_4312bd09.json",
+      "extension": ".json",
+      "size_bytes": 411
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_43d6df1b.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_46ca4ee0.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_495f383e.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_5147f9b4.json",
+      "extension": ".json",
+      "size_bytes": 416
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_52e6c9c1.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_52ee964f.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_56e1ac24.json",
+      "extension": ".json",
+      "size_bytes": 392
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_56efe1de.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_595e9eb3.json",
+      "extension": ".json",
+      "size_bytes": 416
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_5a6a7d75.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_5a7a26f0.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_5ccebace.json",
+      "extension": ".json",
+      "size_bytes": 416
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_5e5db82e.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_5ee775a2.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_60f08eb3.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_652e38a8.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_79ac9d7b.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_7a18c4e1.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_7ab9eeec.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_7acb519e.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_7f5e8919.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_800cb7b7.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_8280e6ef.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_846b177b.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_85bede0d.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_86e2c3a1.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_8c723c03.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_8fb937a7.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_90d7af49.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_916c1155.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_917d78ec.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_9364d044.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_96bdff00.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_97ed6b8c.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_982d29f5.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_9a4c6bca.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_9c9cec76.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_9de0fb51.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_a2765251.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_a47b68ef.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_a4a341c4.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_a5b9b2c6.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_a84680af.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_a90ea290.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_aaa25192.json",
+      "extension": ".json",
+      "size_bytes": 411
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_aea9d6f7.json",
+      "extension": ".json",
+      "size_bytes": 415
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_b2f76f0d.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_b452dcbb.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_b96aabf4.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_bb4d43ee.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_bc275278.json",
+      "extension": ".json",
+      "size_bytes": 410
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_bcb4a909.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_bd551022.json",
+      "extension": ".json",
+      "size_bytes": 415
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_bddf7b56.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_bf5912c3.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_c031c503.json",
+      "extension": ".json",
+      "size_bytes": 408
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_c3334e70.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_ca9f580a.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_caed7b41.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_cf759a7b.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_d8bf1cca.json",
+      "extension": ".json",
+      "size_bytes": 406
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_d9091164.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_d9cbfa11.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_da977d1a.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_dd9be8fe.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_e0befe01.json",
+      "extension": ".json",
+      "size_bytes": 414
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_e179181b.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_e1e782b8.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_e449d4a3.json",
+      "extension": ".json",
+      "size_bytes": 422
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_eacec6b3.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_ee8a7cfb.json",
+      "extension": ".json",
+      "size_bytes": 416
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_f0029a49.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_f261a1ec.json",
+      "extension": ".json",
+      "size_bytes": 409
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_f3866668.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_f9991e96.json",
+      "extension": ".json",
+      "size_bytes": 407
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_fbc7a79b.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\INGEST_SNAPSHOT_fc28cbe6.json",
+      "extension": ".json",
+      "size_bytes": 394
+    },
+    {
+      "path": "snapshots\\VERIFY_LAST.json",
+      "extension": ".json",
+      "size_bytes": 252
+    }
+  ]
+}
