@@ -1,0 +1,10 @@
+{
+  "utterances_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\UTTERANCES.parquet",
+  "num_utterances": 56,
+  "language": "en",
+  "duration_sec": 120.4186875,
+  "model_size": "large-v2",
+  "device": "cpu",
+  "model_dir": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\models\\whisper",
+  "created_utc": "2025-12-27T00:42:01.058227Z"
+}

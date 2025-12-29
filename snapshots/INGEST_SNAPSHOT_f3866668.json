@@ -1,0 +1,10 @@
+{
+  "run_id": "f3866668",
+  "created_utc": "2025-11-30T22:59:08.502722Z",
+  "youtube_url": "https://youtu.be/3aAY01K4uaM?feature=shared",
+  "raw_audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\9662e41388.webm",
+  "audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\f3866668_16k_mono.wav",
+  "sample_rate": 16000,
+  "channels": 1,
+  "duration_sec": 107.43875
+}

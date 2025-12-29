@@ -1,0 +1,10 @@
+{
+  "run_id": "bd551022",
+  "created_utc": "2025-12-16T09:02:15.358899Z",
+  "youtube_url": "https://youtu.be/-5Fu6yBw8tA?si=jJXe5q4RU5X6DvfO",
+  "raw_audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\12f264d900.webm",
+  "audio_path": "C:\\Users\\lukmaan\\Msc_in_AI\\FATCR\\data\\processed\\bd551022_16k_mono.wav",
+  "sample_rate": 16000,
+  "channels": 1,
+  "duration_sec": 4391.7409375
+}
